@@ -1,4 +1,5 @@
 import 'package:fotoboot_operator/camera/booth_camera.dart';
+import 'package:fotoboot_operator/camera/booth_camera_messages.dart';
 
 const bool kBoothCameraSupported = false;
 
@@ -6,9 +7,11 @@ Future<BoothCameraPermission> requestBoothCameraPermission() async {
   return BoothCameraPermission.unsupported;
 }
 
-Future<BoothCameraOpenResult> openBoothCamera() async {
-  return const BoothCameraOpenResult(
+Future<BoothCameraOpenResult> openBoothCamera({
+  bool fromUserGesture = false,
+}) async {
+  return BoothCameraOpenResult(
     permission: BoothCameraPermission.unsupported,
-    error: 'La cámara nativa se conectará cuando elijamos plataforma.',
+    error: BoothCameraMessages.forPermission(BoothCameraPermission.unsupported),
   );
 }

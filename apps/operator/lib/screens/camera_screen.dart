@@ -1,11 +1,15 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:fotoboot_operator/camera/booth_camera.dart';
-import 'package:fotoboot_operator/camera/booth_camera_factory.dart';
+import 'package:fotoboot_operator/camera/camera_manager.dart';
 import 'package:fotoboot_operator/services/photo_controller.dart';
 import 'package:fotoboot_operator/theme/app_colors.dart';
+import 'package:fotoboot_operator/widgets/camera_permission_panel.dart';
+import 'package:fotoboot_operator/widgets/camera_shutter_button.dart';
+import 'package:fotoboot_operator/widgets/camera_timer_control.dart';
 import 'package:fotoboot_operator/widgets/capture_feedback_overlay.dart';
+import 'package:fotoboot_operator/widgets/pick_photo_button.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -19,50 +23,36 @@ class CameraScreen extends StatefulWidget {
 }
 
 class _CameraScreenState extends State<CameraScreen> {
-  BoothCameraSession? _session;
-  BoothCameraPermission _permission = BoothCameraPermission.prompt;
-  String? _cameraError;
-  bool _opening = true;
+  late final CameraManager _cameraManager;
   bool _busy = false;
   bool _saving = false;
   int? _countdown;
   bool _flash = false;
   Uint8List? _reviewBytes;
+  bool _timerEnabled = true;
+  int _timerSeconds = 3;
+  bool _timerMenuOpen = false;
 
   @override
   void initState() {
     super.initState();
-    _openCamera();
+    _cameraManager = CameraManager();
+    _cameraManager.addListener(_onCameraStateChanged);
+
+    if (!kIsWeb) {
+      _cameraManager.openCamera(fromUserGesture: false);
+    }
   }
 
   @override
   void dispose() {
-    _session?.dispose();
+    _cameraManager.removeListener(_onCameraStateChanged);
+    _cameraManager.dispose();
     super.dispose();
   }
 
-  Future<void> _openCamera() async {
-    setState(() {
-      _opening = true;
-      _cameraError = null;
-    });
-
-    final previous = _session;
-    _session = null;
-    await previous?.dispose();
-
-    final result = await openBoothCamera();
-    if (!mounted) {
-      await result.session?.dispose();
-      return;
-    }
-
-    setState(() {
-      _session = result.session;
-      _permission = result.permission;
-      _cameraError = result.isReady ? null : result.error;
-      _opening = false;
-    });
+  void _onCameraStateChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _shoot() async {
@@ -75,30 +65,28 @@ class _CameraScreenState extends State<CameraScreen> {
       }
     }
 
-    final session = _session;
+    final session = _cameraManager.session;
     if (session == null || !session.isReady) {
       await _pickFallback();
       return;
     }
 
-    setState(() {
-      _busy = true;
-      _countdown = 3;
-    });
+    setState(() => _busy = true);
 
-    for (var i = 3; i >= 1; i--) {
+    if (_timerEnabled) {
+      for (var i = _timerSeconds; i >= 1; i--) {
+        if (!mounted) return;
+        setState(() => _countdown = i);
+        await Future<void>.delayed(const Duration(seconds: 1));
+      }
       if (!mounted) return;
-      setState(() => _countdown = i);
-      await Future<void>.delayed(const Duration(seconds: 1));
+      setState(() => _countdown = null);
     }
-
-    if (!mounted) return;
-    setState(() => _countdown = null);
 
     try {
       await _save(await session.capture());
-    } catch (_) {
-      _showError('No se pudo tomar la foto');
+    } catch (e) {
+      _showError('No se pudo tomar la foto: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -158,9 +146,7 @@ class _CameraScreenState extends State<CameraScreen> {
     });
   }
 
-  void _closeReview() {
-    setState(() => _reviewBytes = null);
-  }
+  void _closeReview() => setState(() => _reviewBytes = null);
 
   void _openGallery() {
     _closeReview();
@@ -171,25 +157,23 @@ class _CameraScreenState extends State<CameraScreen> {
     if (!mounted) return;
     showDialog<void>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('No se pudo completar'),
-          content: Text(message),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Entendido'),
-            ),
-          ],
-        );
-      },
+      builder: (context) => AlertDialog(
+        title: const Text('No se pudo completar'),
+        content: Text(message),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final session = _session;
-    final ready = session?.isReady ?? false;
+    final session = _cameraManager.session;
+    final ready = _cameraManager.isReady;
     final previewSize = session?.previewSize;
 
     return Scaffold(
@@ -212,13 +196,15 @@ class _CameraScreenState extends State<CameraScreen> {
               child: Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: _opening
+                  child: _cameraManager.isOpening
                       ? const CircularProgressIndicator(color: AppColors.white)
-                      : _PermissionPanel(
-                          permission: _permission,
-                          message: _cameraError,
-                          onEnable: _busy ? null : _openCamera,
-                          onPick: _busy ? null : _pickFallback,
+                      : CameraPermissionPanel(
+                          permission: _cameraManager.permission,
+                          message: _cameraManager.error,
+                          busy: _busy,
+                          onEnable: () =>
+                              _cameraManager.openCamera(fromUserGesture: true),
+                          onPick: _pickFallback,
                         ),
                 ),
               ),
@@ -241,53 +227,50 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
               ),
             ),
-          if (ready && !_saving && _reviewBytes == null)
+          if (ready && !_saving && _reviewBytes == null) ...[
             SafeArea(
               child: Align(
-                alignment: Alignment.bottomCenter,
+                alignment: Alignment.topLeft,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextButton(
-                        onPressed: _busy ? null : _pickFallback,
-                        child: const Text(
-                          'Elegir foto',
-                          style: TextStyle(color: AppColors.white, fontSize: 16),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      GestureDetector(
-                        onTap: _busy ? null : _shoot,
-                        child: Container(
-                          width: 84,
-                          height: 84,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _busy ? AppColors.grey : AppColors.red,
-                            border: Border.all(color: AppColors.white, width: 5),
-                          ),
-                          child: _busy && _countdown == null
-                              ? const Padding(
-                                  padding: EdgeInsets.all(22),
-                                  child: CircularProgressIndicator(
-                                    color: AppColors.white,
-                                    strokeWidth: 3,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.camera_alt,
-                                  color: AppColors.white,
-                                  size: 36,
-                                ),
-                        ),
-                      ),
-                    ],
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: PickPhotoButton(
+                    enabled: !_busy,
+                    onPressed: _pickFallback,
                   ),
                 ),
               ),
             ),
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topRight,
+                child: CameraTimerControl(
+                  busy: _busy,
+                  menuOpen: _timerMenuOpen,
+                  enabled: _timerEnabled,
+                  seconds: _timerSeconds,
+                  onToggleMenu: () {
+                    if (_busy) return;
+                    setState(() => _timerMenuOpen = !_timerMenuOpen);
+                  },
+                  onSelect: (seconds) {
+                    setState(() {
+                      _timerEnabled = seconds != null;
+                      if (seconds != null) _timerSeconds = seconds;
+                      _timerMenuOpen = false;
+                    });
+                  },
+                ),
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: CameraShutterButton(
+                busy: _busy,
+                capturing: _busy && _countdown == null,
+                onShoot: _shoot,
+              ),
+            ),
+          ],
           if (_saving) const CaptureSavingOverlay(),
           if (_reviewBytes != null)
             CaptureSavedSheet(
@@ -295,63 +278,6 @@ class _CameraScreenState extends State<CameraScreen> {
               onTakeAnother: _closeReview,
               onOpenGallery: _openGallery,
             ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PermissionPanel extends StatelessWidget {
-  const _PermissionPanel({
-    required this.permission,
-    required this.onEnable,
-    required this.onPick,
-    this.message,
-  });
-
-  final BoothCameraPermission permission;
-  final String? message;
-  final VoidCallback? onEnable;
-  final VoidCallback? onPick;
-
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 420),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.videocam_outlined, color: AppColors.white, size: 56),
-          const SizedBox(height: 16),
-          Text(
-            message ??
-                'Pulsa Activar cámara. Chrome pedirá permiso en esta pestaña.',
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.white, fontSize: 18),
-          ),
-          if (permission == BoothCameraPermission.unsupported) ...[
-            const SizedBox(height: 8),
-            const Text(
-              'Esta build está preparada para probar en web.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.grey, fontSize: 14),
-            ),
-          ],
-          const SizedBox(height: 24),
-          if (permission != BoothCameraPermission.unsupported)
-            FilledButton(
-              onPressed: onEnable,
-              child: const Text('Activar cámara'),
-            ),
-          const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: onPick,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.white,
-              side: const BorderSide(color: AppColors.white, width: 2),
-            ),
-            child: const Text('Elegir foto'),
-          ),
         ],
       ),
     );
