@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:fotoboot_operator/config/app_config.dart';
 import 'package:fotoboot_operator/services/token_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 class ApiException implements Exception {
   ApiException(this.message, {this.statusCode});
@@ -53,6 +55,40 @@ class EventInfo {
       isActive: json['isActive'] as bool? ?? false,
       publicUrl: json['publicUrl'] as String,
       publicToken: json['publicToken'] as String?,
+    );
+  }
+}
+
+class RemotePhoto {
+  const RemotePhoto({
+    required this.id,
+    required this.eventId,
+    required this.clientPhotoId,
+    required this.takenAt,
+    required this.thumbUrl,
+    required this.originalUrl,
+    this.printedAt,
+  });
+
+  final String id;
+  final String eventId;
+  final String clientPhotoId;
+  final DateTime takenAt;
+  final DateTime? printedAt;
+  final String thumbUrl;
+  final String originalUrl;
+
+  factory RemotePhoto.fromJson(Map<String, dynamic> json) {
+    return RemotePhoto(
+      id: json['id'] as String,
+      eventId: json['eventId'] as String,
+      clientPhotoId: json['clientPhotoId'] as String,
+      takenAt: DateTime.parse(json['takenAt'] as String),
+      printedAt: json['printedAt'] == null
+          ? null
+          : DateTime.parse(json['printedAt'] as String),
+      thumbUrl: json['thumbUrl'] as String,
+      originalUrl: json['originalUrl'] as String,
     );
   }
 }
@@ -189,6 +225,116 @@ class ApiClient {
       );
     }
     return EventInfo.fromJson(body);
+  }
+
+  Future<List<RemotePhoto>> listPhotos(String eventId) async {
+    final response = await _authorized((headers) {
+      return _http.get(
+        _uri('/v1/photos').replace(queryParameters: {'eventId': eventId}),
+        headers: headers,
+      );
+    });
+    if (response.statusCode != 200) {
+      final body = _decode(response);
+      throw ApiException(
+        body['message']?.toString() ?? 'Could not list photos',
+        statusCode: response.statusCode,
+      );
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) return [];
+    return decoded
+        .whereType<Map>()
+        .map((item) => RemotePhoto.fromJson(Map<String, dynamic>.from(item)))
+        .toList();
+  }
+
+  Future<RemotePhoto> uploadPhoto({
+    required String eventId,
+    required String clientPhotoId,
+    required DateTime takenAt,
+    required Uint8List bytes,
+  }) async {
+    final response = await _authorizedMultipart((access) {
+      final request = http.MultipartRequest('POST', _uri('/v1/photos'));
+      request.headers['Authorization'] = 'Bearer $access';
+      request.fields['eventId'] = eventId;
+      request.fields['clientPhotoId'] = clientPhotoId;
+      request.fields['takenAt'] = takenAt.toUtc().toIso8601String();
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: '$clientPhotoId.jpg',
+          contentType: MediaType('image', 'jpeg'),
+        ),
+      );
+      return request;
+    });
+    final body = _decode(response);
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw ApiException(
+        body['message']?.toString() ?? 'Could not upload photo',
+        statusCode: response.statusCode,
+      );
+    }
+    return RemotePhoto.fromJson(body);
+  }
+
+  Future<void> deletePhoto(String id) async {
+    final response = await _authorized((headers) {
+      return _http.delete(_uri('/v1/photos/$id'), headers: headers);
+    });
+    if (response.statusCode == 204 || response.statusCode == 404) return;
+    final body = _decode(response);
+    throw ApiException(
+      body['message']?.toString() ?? 'Could not delete photo',
+      statusCode: response.statusCode,
+    );
+  }
+
+  Future<Uint8List> downloadPhotoFile(
+    String id, {
+    String variant = 'thumb',
+  }) async {
+    final response = await _authorized((headers) {
+      return _http.get(
+        _uri('/v1/photos/$id/file').replace(
+          queryParameters: {'variant': variant},
+        ),
+        headers: headers,
+      );
+    });
+    if (response.statusCode != 200) {
+      throw ApiException(
+        'Could not download photo',
+        statusCode: response.statusCode,
+      );
+    }
+    return response.bodyBytes;
+  }
+
+  Future<http.Response> _authorizedMultipart(
+    http.MultipartRequest Function(String access) build,
+  ) async {
+    var access = await _tokens.readAccessToken();
+    if (access == null || access.isEmpty) {
+      await refresh();
+      access = await _tokens.readAccessToken();
+    }
+
+    Future<http.Response> send(String token) async {
+      final streamed = await _http.send(build(token));
+      return http.Response.fromStream(streamed);
+    }
+
+    var response = await send(access!);
+    if (response.statusCode == 401) {
+      await refresh();
+      access = await _tokens.readAccessToken();
+      response = await send(access!);
+    }
+    return response;
   }
 
   Future<http.Response> _authorized(

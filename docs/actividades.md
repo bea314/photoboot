@@ -90,40 +90,40 @@ Leyenda de estado para ir tachando:
 
 ### C1. Cámara y almacenamiento local
 
-- [ ] Permisos de cámara.
-- [ ] Preview a pantalla completa + countdown 3-2-1.
-- [ ] Disparo → JPEG en disco de la app + `clientPhotoId`.
-- [ ] Persistencia local (Hive/SQLite/Isar): cola de fotos y estados (`pending_upload`, `synced`, `error`).
+- [x] Permisos de cámara.
+- [x] Preview a pantalla completa + countdown 3-2-1.
+- [x] Disparo → JPEG en disco de la app + `clientPhotoId`.
+- [x] Persistencia local (Hive/SQLite/Isar): cola de fotos y estados (`pending_upload`, `synced`, `error`).
 
 **Depende de:** A2.
 **Listo cuando:** se toman 5 fotos sin API y sobreviven un restart.
 
 ### C2. Upload e idempotencia
 
-- [ ] API `POST /v1/photos` multipart (`file`, `eventId`, `clientPhotoId`, `takenAt`).
-- [ ] Guardar original en `{FILES_ROOT}/events/{eventId}/originals/`.
-- [ ] Generar thumbnail y guardar en `…/thumbs/`.
-- [ ] `clientPhotoId` único por evento: reintento no duplica.
-- [ ] `GET /v1/photos?eventId=`, `GET /v1/photos/:id`, `DELETE /v1/photos/:id` (soft-delete + borrar archivos).
+- [x] API `POST /v1/photos` multipart (`file`, `eventId`, `clientPhotoId`, `takenAt`).
+- [x] Guardar original en `{FILES_ROOT}/events/{eventId}/originals/`.
+- [x] Generar thumbnail y guardar en `…/thumbs/`.
+- [x] `clientPhotoId` único por evento: reintento no duplica.
+- [x] `GET /v1/photos?eventId=`, `GET /v1/photos/:id`, `DELETE /v1/photos/:id` (soft-delete + borrar archivos).
 
 **Depende de:** A3, B1.
 **Listo cuando:** curl sube un JPG, lista thumbs y el segundo POST con el mismo `clientPhotoId` no crea otra fila.
 
 ### C3. Sync en Flutter
 
-- [ ] Cola en background: si hay red, `POST /photos`; si no, reintenta.
-- [ ] Reconciliar con `GET /photos` (borrados remotos, fotos de otra sesión).
-- [ ] Badge por foto: local-only / synced / error.
+- [x] Cola en background: si hay red, `POST /photos`; si no, reintenta.
+- [x] Reconciliar con `GET /photos` (borrados remotos, fotos de otra sesión).
+- [x] Badge por foto: local-only / synced / error.
 
 **Depende de:** C1, C2, B2.
 **Listo cuando:** avión → 3 fotos → se imprimiría igual → se quita avión → las 3 aparecen en API.
 
 ### C4. Galería operador
 
-- [ ] Masonry con thumbs locales o de red.
-- [ ] Selección múltiple.
-- [ ] Detalle: foto grande, fecha, estado sync/impresa.
-- [ ] Eliminar en detalle y en lote (confirmación).
+- [x] Masonry con thumbs locales o de red.
+- [x] Selección múltiple.
+- [x] Detalle: foto grande, fecha, estado sync/impresa.
+- [x] Eliminar en detalle y en lote (confirmación).
 
 **Depende de:** C3.
 **Listo cuando:** masonry + detalle + borrar funcionan online y offline.

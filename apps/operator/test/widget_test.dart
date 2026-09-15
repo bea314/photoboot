@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fotoboot_operator/main.dart';
 import 'package:fotoboot_operator/services/api_client.dart';
 import 'package:fotoboot_operator/services/auth_controller.dart';
+import 'package:fotoboot_operator/services/photo_controller.dart';
 import 'package:fotoboot_operator/services/token_storage.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -59,9 +60,10 @@ void main() {
     final tokens = TokenStorage(storage: _MemoryStorage());
     final api = ApiClient(tokenStorage: tokens);
     final auth = AuthController(tokenStorage: tokens, apiClient: api);
+    final photos = PhotoController(api: api, auth: auth);
     await auth.bootstrap();
 
-    await tester.pumpWidget(FotobootOperatorApp(auth: auth));
+    await tester.pumpWidget(FotobootOperatorApp(auth: auth, photos: photos));
     await tester.pumpAndSettle();
 
     expect(find.text('Fotoboot'), findsOneWidget);

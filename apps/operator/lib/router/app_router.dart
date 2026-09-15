@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:fotoboot_operator/screens/camera_screen.dart';
 import 'package:fotoboot_operator/screens/event_screen.dart';
+import 'package:fotoboot_operator/screens/gallery_screen.dart';
 import 'package:fotoboot_operator/screens/login_screen.dart';
 import 'package:fotoboot_operator/screens/placeholder_screen.dart';
+import 'package:fotoboot_operator/screens/photo_detail_screen.dart';
 import 'package:fotoboot_operator/services/auth_controller.dart';
-import 'package:fotoboot_operator/theme/app_colors.dart';
+import 'package:fotoboot_operator/services/photo_controller.dart';
 import 'package:go_router/go_router.dart';
 
-GoRouter createAppRouter(AuthController auth) {
+GoRouter createAppRouter(AuthController auth, PhotoController photos) {
   return GoRouter(
     initialLocation: '/login',
     refreshListenable: auth,
@@ -33,11 +36,7 @@ GoRouter createAppRouter(AuthController auth) {
               GoRoute(
                 path: '/camera',
                 name: 'camera',
-                builder: (context, state) => const PlaceholderScreen(
-                  title: 'Cámara',
-                  subtitle: 'Countdown 3-2-1 y captura (Fase C).',
-                  icon: Icons.photo_camera_outlined,
-                ),
+                builder: (context, state) => CameraScreen(photos: photos),
               ),
             ],
           ),
@@ -46,19 +45,14 @@ GoRouter createAppRouter(AuthController auth) {
               GoRoute(
                 path: '/gallery',
                 name: 'gallery',
-                builder: (context, state) => const PlaceholderScreen(
-                  title: 'Galería',
-                  subtitle: 'Masonry + selección múltiple (Fase C).',
-                  icon: Icons.photo_library_outlined,
-                ),
+                builder: (context, state) => GalleryScreen(photos: photos),
                 routes: [
                   GoRoute(
-                    path: 'detail',
+                    path: 'detail/:clientPhotoId',
                     name: 'detail',
-                    builder: (context, state) => const PlaceholderScreen(
-                      title: 'Detalle',
-                      subtitle: 'Foto grande, imprimir y eliminar (Fase C/D).',
-                      icon: Icons.image_outlined,
+                    builder: (context, state) => PhotoDetailScreen(
+                      photos: photos,
+                      clientPhotoId: state.pathParameters['clientPhotoId']!,
                     ),
                   ),
                 ],
@@ -135,15 +129,6 @@ class OperatorShell extends StatelessWidget {
           ),
         ],
       ),
-      floatingActionButton: navigationShell.currentIndex == 1
-          ? FloatingActionButton.extended(
-              onPressed: () => context.go('/gallery/detail'),
-              backgroundColor: AppColors.red,
-              foregroundColor: AppColors.white,
-              icon: const Icon(Icons.open_in_new),
-              label: const Text('Detalle'),
-            )
-          : null,
     );
   }
 }
