@@ -37,6 +37,16 @@ class PhotoController extends ChangeNotifier {
   bool get started => _started;
   bool get syncing => _syncing;
   List<LocalPhoto> get photos => List.unmodifiable(_photos);
+  ApiClient get api => _api;
+
+  /// Local mark used after a successful booth print (API may also set printedAt).
+  Future<void> markPrintedLocally(String clientPhotoId) async {
+    final photo = _store.getById(clientPhotoId);
+    if (photo == null || photo.printedAt != null) return;
+    await _store.upsert(photo.copyWith(printedAt: DateTime.now()));
+    _reloadLocal();
+    notifyListeners();
+  }
 
   Future<void> bind() async {
     _auth.addListener(_onAuthChanged);

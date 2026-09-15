@@ -5,10 +5,20 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { EventsModule } from './events/events.module';
 import { HealthModule } from './health/health.module';
 import { PhotosModule } from './photos/photos.module';
+import { PrintJobsModule } from './print-jobs/print-jobs.module';
+import { PrinterModule } from './printer/printer.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
-  imports: [PrismaModule, HealthModule, AuthModule, EventsModule, PhotosModule],
+  imports: [
+    PrismaModule,
+    HealthModule,
+    AuthModule,
+    EventsModule,
+    PhotosModule,
+    PrintJobsModule,
+    PrinterModule,
+  ],
   providers: [
     {
       provide: APP_GUARD,

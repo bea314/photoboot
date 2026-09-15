@@ -1,5 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:fotoboot_operator/models/local_photo.dart';
+import 'package:fotoboot_operator/printing/print_job_reporter.dart';
+import 'package:fotoboot_operator/printing/print_service.dart';
+import 'package:fotoboot_operator/printing/printer_profiles.dart';
+import 'package:fotoboot_operator/printing/printer_settings.dart';
+import 'package:fotoboot_operator/printing/transport/bluetooth_transport.dart';
+import 'package:fotoboot_operator/printing/transport/printer_transport.dart';
+import 'package:fotoboot_operator/printing/transport/stub_transport.dart';
+import 'package:fotoboot_operator/printing/transport/tcp_transport.dart';
+import 'package:fotoboot_operator/services/auth_controller.dart';
 import 'package:fotoboot_operator/services/photo_controller.dart';
 import 'package:fotoboot_operator/services/photo_download.dart';
 import 'package:fotoboot_operator/theme/app_colors.dart';
@@ -47,10 +56,12 @@ class PhotoDetailScreen extends StatefulWidget {
   const PhotoDetailScreen({
     super.key,
     required this.photos,
+    required this.auth,
     required this.clientPhotoId,
   });
 
   final PhotoController photos;
+  final AuthController auth;
   final String clientPhotoId;
 
   @override
@@ -60,6 +71,10 @@ class PhotoDetailScreen extends StatefulWidget {
 class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
   bool _infoExpanded = true;
   bool _downloading = false;
+  bool _printing = false;
+
+  final _settings = PrinterSettingsStore();
+  final _printService = PrintService();
 
   String _format(DateTime value) {
     final local = value.toLocal();
@@ -109,6 +124,117 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
       );
     } finally {
       if (mounted) setState(() => _downloading = false);
+    }
+  }
+
+  PrinterTransport _transportFor(String id) {
+    switch (id) {
+      case 'tcp':
+        return TcpPrinterTransport();
+      case 'bluetooth':
+        return BluetoothPrinterTransport();
+      default:
+        return StubPrinterTransport();
+    }
+  }
+
+  Future<void> _printOne(LocalPhoto photo) async {
+    if (_printing) return;
+
+    final warning = await _settings.galleryPrintWarning();
+    if (warning != null && mounted) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Impresora'),
+          content: Text(warning),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Imprimir igual'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) return;
+    }
+
+    setState(() => _printing = true);
+    try {
+      final bytes = await widget.photos.files.readOriginal(photo.clientPhotoId) ??
+          await widget.photos.files.readBest(photo.clientPhotoId);
+      if (bytes == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No hay archivo local para imprimir')),
+          );
+        }
+        return;
+      }
+
+      final profileId = await _settings.readActiveProfileId();
+      final profile = PrinterProfile.byId(profileId);
+      final endpoint =
+          await _settings.readLastEndpoint() ?? PrinterEndpoint.stub;
+      final transport = _transportFor(endpoint.transportId);
+      final reporter = PrintJobReporter(api: widget.auth.api);
+
+      final result = await _printService.printOne(
+        photo: PhotoPrintRequest(
+          imageBytes: bytes,
+          photoId: photo.serverId,
+          clientPhotoId: photo.clientPhotoId,
+        ),
+        profile: profile,
+        transport: transport,
+        endpoint: endpoint,
+      );
+      await transport.disconnect();
+
+      if (photo.serverId != null) {
+        await reporter.report(
+          PrintJobReport(
+            eventId: photo.eventId,
+            printerProfile: profile.id.apiId,
+            copies: 1,
+            localStatus: result.ok ? 'printed' : 'failed',
+            type: 'photo',
+            photoIds: [photo.serverId!],
+            error: result.error,
+          ),
+        );
+      }
+
+      if (result.ok) {
+        await widget.photos.markPrintedLocally(photo.clientPhotoId);
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.ok
+                ? 'Impresa (${result.bytesSent} bytes)'
+                : (result.error ?? 'Error al imprimir'),
+          ),
+          backgroundColor: result.ok ? null : AppColors.redDark,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al imprimir: $e'),
+            backgroundColor: AppColors.redDark,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _printing = false);
     }
   }
 
@@ -195,6 +321,8 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
                     : 'Impresa ${_format(photo.printedAt!)}',
                 onToggle: () => setState(() => _infoExpanded = !_infoExpanded),
                 onDelete: _delete,
+                onPrint: _printing ? null : () => _printOne(photo),
+                printing: _printing,
               ),
             ],
           ),
@@ -212,6 +340,8 @@ class _InfoSheet extends StatelessWidget {
     required this.printedLabel,
     required this.onToggle,
     required this.onDelete,
+    required this.onPrint,
+    required this.printing,
   });
 
   final LocalPhoto photo;
@@ -220,6 +350,8 @@ class _InfoSheet extends StatelessWidget {
   final String printedLabel;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
+  final VoidCallback? onPrint;
+  final bool printing;
 
   @override
   Widget build(BuildContext context) {
@@ -311,8 +443,13 @@ class _InfoSheet extends StatelessWidget {
                         ),
                       ],
                       const SizedBox(height: 18),
+                      FilledButton(
+                        onPressed: onPrint,
+                        child: Text(printing ? 'Imprimiendo…' : 'Imprimir'),
+                      ),
+                      const SizedBox(height: 12),
                       OutlinedButton(
-                        onPressed: onDelete,
+                        onPressed: printing ? null : onDelete,
                         child: const Text('Eliminar'),
                       ),
                     ],

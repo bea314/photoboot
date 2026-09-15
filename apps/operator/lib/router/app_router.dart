@@ -3,8 +3,8 @@ import 'package:fotoboot_operator/screens/camera_screen.dart';
 import 'package:fotoboot_operator/screens/event_screen.dart';
 import 'package:fotoboot_operator/screens/gallery_screen.dart';
 import 'package:fotoboot_operator/screens/login_screen.dart';
-import 'package:fotoboot_operator/screens/placeholder_screen.dart';
 import 'package:fotoboot_operator/screens/photo_detail_screen.dart';
+import 'package:fotoboot_operator/screens/printer_screen.dart';
 import 'package:fotoboot_operator/services/auth_controller.dart';
 import 'package:fotoboot_operator/services/photo_controller.dart';
 import 'package:go_router/go_router.dart';
@@ -52,6 +52,7 @@ GoRouter createAppRouter(AuthController auth, PhotoController photos) {
                     name: 'detail',
                     builder: (context, state) => PhotoDetailScreen(
                       photos: photos,
+                      auth: auth,
                       clientPhotoId: state.pathParameters['clientPhotoId']!,
                     ),
                   ),
@@ -64,11 +65,7 @@ GoRouter createAppRouter(AuthController auth, PhotoController photos) {
               GoRoute(
                 path: '/printer',
                 name: 'printer',
-                builder: (context, state) => const PlaceholderScreen(
-                  title: 'Gestión',
-                  subtitle: 'Impresora térmica / L8050 y test print (Fase D).',
-                  icon: Icons.print_outlined,
-                ),
+                builder: (context, state) => PrinterScreen(auth: auth),
               ),
             ],
           ),

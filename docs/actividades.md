@@ -134,45 +134,51 @@ Leyenda de estado para ir tachando:
 
 ### D1. Perfiles y preview
 
-- [ ] Perfiles en app (y defaults en API si se quiere): `thermal_80`, `epson_l8050_4x6`.
-- [ ] Preview: marco 80 mm vs marco 10×15, center-crop visible.
-- [ ] Pantalla Gestión → Impresora: perfil activo, último dispositivo, estado.
+- [x] Perfiles en app (y defaults en API si se quiere): `thermal_80`, `epson_l8050_4x6`.
+- [x] Preview: marco 80 mm vs marco 10×15, center-crop visible.
+- [x] Pantalla Gestión → Impresora: perfil activo, último dispositivo, estado.
 
 **Depende de:** A2, C4.
 **Listo cuando:** la misma foto se ve recortada distinto en cada perfil, sin imprimir aún.
 
 ### D2. Raster + ESC/POS (térmica de prueba)
 
-- [ ] Descubrir/emparejar térmica (Bluetooth y/o TCP `IP:9100`).
-- [ ] Raster: escala al ancho, dither, bitmap ESC/POS.
-- [ ] Imprimir 1 foto desde detalle.
-- [ ] Imprimir N desde masonry.
-- [ ] Errores legibles: desconectada, timeout, papel.
+- [~] Descubrir/emparejar térmica (Bluetooth y/o TCP `IP:9100`).
+- [x] Raster: escala al ancho, dither, bitmap ESC/POS.
+- [x] Imprimir 1 foto desde detalle.
+- [~] Imprimir N desde masonry.
+- [x] Errores legibles: desconectada, timeout, papel.
 
 **Depende de:** D1.
 **Listo cuando:** la térmica de prueba saca una foto reconocible y un lote de 3.
 
+> D2 notes: TCP `IP:9100` + stub simulator are wired. Bluetooth SPP is an interface stub (readable “unsupported” until hardware plugin). Detalle wires `PrintService.printOne` (1 foto). Multi-select “Imprimir N” from masonry still needs C4 selection UI — `PrintService.printPhotos` is ready. Gestión keeps demo + test paths.
+
 ### D3. Test print térmica
 
-- [ ] Ticket de prueba: marca Fotoboot, perfil, fecha, bloque de contraste, sample.
-- [ ] Si el test falla, advertencia en rojo en galería.
+- [x] Ticket de prueba: marca Fotoboot, perfil, fecha, bloque de contraste, sample.
+- [x] Si el test falla, advertencia en rojo en galería.
 
 **Depende de:** D2.
 **Listo cuando:** “Imprimir prueba” es el primer check al montar el booth.
 
+> D3 notes: Red warning lives on Gestión and via `PrinterSettingsStore.galleryPrintWarning()` for C4 gallery to consume. Hardware paper feed needs a real thermal to verify visually.
+
 ### D4. PrintJob en API
 
-- [ ] `POST /v1/print-jobs` y `PATCH /v1/print-jobs/:id`.
-- [ ] Flutter reporta `printed` / `failed` (encolado si no hay red).
-- [ ] Marcar `Photo.printedAt` cuando al menos una copia salió bien.
-- [ ] Jobs `type: test` no exigen `photoId`.
+- [x] `POST /v1/print-jobs` y `PATCH /v1/print-jobs/:id`.
+- [x] Flutter reporta `printed` / `failed` (encolado si no hay red).
+- [x] Marcar `Photo.printedAt` cuando al menos una copia salió bien.
+- [x] Jobs `type: test` no exigen `photoId`.
 
 **Depende de:** C2, D2.
 **Listo cuando:** después de imprimir, la API tiene el histórico y la galería muestra “impresa”.
 
+> D4 notes: `printedAt` updates when photoIds exist (needs Phase C2 photos). Test jobs work without photos. Flutter offline queue persists in secure storage.
+
 ### D5. Epson L8050
 
-- [ ] Generar JPEG/PDF 10×15 a ≥ 300 ppp (el mismo recorte del preview).
+- [x] Generar JPEG/PDF 10×15 a ≥ 300 ppp (el mismo recorte del preview).
 - [ ] Envío por cola del SO / SDK Epson / WiFi Direct (sin diálogo si se puede).
 - [ ] Fallback: diálogo nativo (AirPrint/Mopria).
 - [ ] Test print L8050 (bloque rojo/blanco + sample 10×15).
@@ -180,6 +186,8 @@ Leyenda de estado para ir tachando:
 
 **Depende de:** D1, D3, D4.
 **Listo cuando:** una foto sale en 10×15 en la L8050 y el test print también.
+
+> D5 notes: `EpsonPrintScaffold` builds the 10×15 @ 300 dpi JPEG (center-crop). Send path / SDK / OS dialog are TODO with clear `PrinterException.unsupported`.
 
 ---
 

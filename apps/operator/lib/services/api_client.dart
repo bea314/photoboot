@@ -93,6 +93,64 @@ class RemotePhoto {
   }
 }
 
+
+class PrintJobInfo {
+  const PrintJobInfo({
+    required this.id,
+    required this.eventId,
+    required this.printerProfile,
+    required this.type,
+    required this.copies,
+    required this.status,
+    required this.photoIds,
+    this.error,
+  });
+
+  final String id;
+  final String eventId;
+  final String printerProfile;
+  final String type;
+  final int copies;
+  final String status;
+  final List<String> photoIds;
+  final String? error;
+
+  factory PrintJobInfo.fromJson(Map<String, dynamic> json) {
+    return PrintJobInfo(
+      id: json['id'] as String,
+      eventId: json['eventId'] as String,
+      printerProfile: json['printerProfile'] as String,
+      type: json['type'] as String? ?? 'photo',
+      copies: json['copies'] as int? ?? 1,
+      status: json['status'] as String? ?? 'queued',
+      photoIds: (json['photoIds'] as List<dynamic>? ?? [])
+          .map((e) => e.toString())
+          .toList(),
+      error: json['error'] as String?,
+    );
+  }
+}
+
+class PrinterProfilesResponse {
+  const PrinterProfilesResponse({
+    required this.profiles,
+    required this.defaultProfileId,
+  });
+
+  final List<Map<String, dynamic>> profiles;
+  final String defaultProfileId;
+
+  factory PrinterProfilesResponse.fromJson(Map<String, dynamic> json) {
+    final list = (json['profiles'] as List<dynamic>? ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+    return PrinterProfilesResponse(
+      profiles: list,
+      defaultProfileId: json['defaultProfileId'] as String? ?? 'thermal_80',
+    );
+  }
+}
+
 class ApiClient {
   ApiClient({
     required TokenStorage tokenStorage,
@@ -312,6 +370,89 @@ class ApiClient {
       );
     }
     return response.bodyBytes;
+  }
+
+
+  Future<PrinterProfilesResponse> getPrinterProfiles() async {
+    final response = await _authorized((headers) {
+      return _http.get(_uri('/v1/printer/profiles'), headers: headers);
+    });
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        body['message']?.toString() ?? 'Could not load printer profiles',
+        statusCode: response.statusCode,
+      );
+    }
+    return PrinterProfilesResponse.fromJson(body);
+  }
+
+  Future<PrintJobInfo> createPrintJob({
+    required String eventId,
+    required String printerProfile,
+    List<String> photoIds = const [],
+    String type = 'photo',
+    int copies = 1,
+    String localStatus = 'queued',
+    String? error,
+  }) async {
+    final payload = <String, dynamic>{
+      'eventId': eventId,
+      'printerProfile': printerProfile,
+      'type': type,
+      'copies': copies,
+      'localStatus': localStatus,
+      if (photoIds.isNotEmpty) 'photoIds': photoIds,
+      if (error != null) 'error': error,
+    };
+
+    final response = await _authorized((headers) {
+      return _http.post(
+        _uri('/v1/print-jobs'),
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(payload),
+      );
+    });
+    final body = _decode(response);
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw ApiException(
+        body['message']?.toString() ?? 'Could not create print job',
+        statusCode: response.statusCode,
+      );
+    }
+    return PrintJobInfo.fromJson(body);
+  }
+
+  Future<PrintJobInfo> updatePrintJob(
+    String id, {
+    required String localStatus,
+    String? error,
+  }) async {
+    final payload = <String, dynamic>{
+      'localStatus': localStatus,
+      if (error != null) 'error': error,
+    };
+    final response = await _authorized((headers) {
+      return _http.patch(
+        _uri('/v1/print-jobs/$id'),
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(payload),
+      );
+    });
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        body['message']?.toString() ?? 'Could not update print job',
+        statusCode: response.statusCode,
+      );
+    }
+    return PrintJobInfo.fromJson(body);
   }
 
   Future<http.Response> _authorizedMultipart(
