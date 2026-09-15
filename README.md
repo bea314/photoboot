@@ -39,7 +39,8 @@ npm run start:dev
 ```
 
 - Health: http://localhost:3000/health
-- Admin seed: `admin@fotoboot.local` / `admin1234`
+- Auth: `POST /v1/auth/login` — admin seed: `admin@fotoboot.local` / `admin1234`
+- Evento: `GET /v1/events/current` (Bearer)
 
 ### 3. Operador (Flutter)
 

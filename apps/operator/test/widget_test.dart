@@ -1,13 +1,70 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fotoboot_operator/main.dart';
-import 'package:fotoboot_operator/router/app_router.dart';
+import 'package:fotoboot_operator/services/api_client.dart';
+import 'package:fotoboot_operator/services/auth_controller.dart';
+import 'package:fotoboot_operator/services/token_storage.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+class _MemoryStorage extends FlutterSecureStorage {
+  final Map<String, String> _data = {};
+
+  @override
+  Future<void> write({
+    required String key,
+    required String? value,
+    AndroidOptions? aOptions,
+    IOSOptions? iOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    MacOsOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (value == null) {
+      _data.remove(key);
+    } else {
+      _data[key] = value;
+    }
+  }
+
+  @override
+  Future<String?> read({
+    required String key,
+    AndroidOptions? aOptions,
+    IOSOptions? iOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    MacOsOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async =>
+      _data[key];
+
+  @override
+  Future<void> delete({
+    required String key,
+    AndroidOptions? aOptions,
+    IOSOptions? iOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    MacOsOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    _data.remove(key);
+  }
+}
 
 void main() {
-  testWidgets('app boots on login placeholder', (tester) async {
-    await tester.pumpWidget(FotobootOperatorApp(router: createAppRouter()));
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('app boots on login screen', (tester) async {
+    final tokens = TokenStorage(storage: _MemoryStorage());
+    final api = ApiClient(tokenStorage: tokens);
+    final auth = AuthController(tokenStorage: tokens, apiClient: api);
+    await auth.bootstrap();
+
+    await tester.pumpWidget(FotobootOperatorApp(auth: auth));
     await tester.pumpAndSettle();
 
-    expect(find.text('Login'), findsWidgets);
-    expect(find.text('Fase A — placeholder'), findsOneWidget);
+    expect(find.text('Fotoboot'), findsOneWidget);
+    expect(find.text('Entrar'), findsOneWidget);
   });
 }

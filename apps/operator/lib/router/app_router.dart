@@ -1,19 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:fotoboot_operator/screens/event_screen.dart';
+import 'package:fotoboot_operator/screens/login_screen.dart';
 import 'package:fotoboot_operator/screens/placeholder_screen.dart';
+import 'package:fotoboot_operator/services/auth_controller.dart';
 import 'package:fotoboot_operator/theme/app_colors.dart';
+import 'package:go_router/go_router.dart';
 
-final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
-
-GoRouter createAppRouter() {
+GoRouter createAppRouter(AuthController auth) {
   return GoRouter(
-    navigatorKey: _rootNavigatorKey,
     initialLocation: '/login',
+    refreshListenable: auth,
+    redirect: (context, state) {
+      if (!auth.ready) return null;
+      final loggingIn = state.matchedLocation == '/login';
+      if (!auth.authenticated && !loggingIn) return '/login';
+      if (auth.authenticated && loggingIn) return '/camera';
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/login',
         name: 'login',
-        builder: (context, state) => const _LoginPlaceholder(),
+        builder: (context, state) => LoginScreen(auth: auth),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
@@ -75,11 +83,7 @@ GoRouter createAppRouter() {
               GoRoute(
                 path: '/event',
                 name: 'event',
-                builder: (context, state) => const PlaceholderScreen(
-                  title: 'Evento / QR',
-                  subtitle: 'Link público y QR del evento (Fase B).',
-                  icon: Icons.qr_code_2,
-                ),
+                builder: (context, state) => EventScreen(auth: auth),
               ),
             ],
           ),
@@ -87,57 +91,6 @@ GoRouter createAppRouter() {
       ),
     ],
   );
-}
-
-class _LoginPlaceholder extends StatelessWidget {
-  const _LoginPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Spacer(),
-              const Icon(Icons.lock_outline, size: 72, color: AppColors.red),
-              const SizedBox(height: 24),
-              Text(
-                'Login',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: AppColors.red,
-                      fontWeight: FontWeight.w700,
-                    ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Email y password del operador (Fase B).',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.grey, fontSize: 16),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Fase A — placeholder',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.red,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Spacer(),
-              FilledButton(
-                onPressed: () => context.go('/camera'),
-                child: const Text('Entrar (demo)'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class OperatorShell extends StatelessWidget {

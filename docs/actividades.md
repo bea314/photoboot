@@ -57,29 +57,29 @@ Leyenda de estado para ir tachando:
 
 ### B1. Auth en API
 
-- [ ] `POST /v1/auth/login`
-- [ ] `POST /v1/auth/refresh`
-- [ ] `POST /v1/auth/logout`
-- [ ] Guard JWT en rutas `/v1/*` excepto `/auth/*` y `/public/*`.
+- [x] `POST /v1/auth/login`
+- [x] `POST /v1/auth/refresh`
+- [x] `POST /v1/auth/logout`
+- [x] Guard JWT en rutas `/v1/*` excepto `/auth/*` y `/public/*`.
 
 **Depende de:** A3.
 **Listo cuando:** Postman/Insomnia obtiene tokens y una ruta protegida rechaza sin Bearer.
 
 ### B2. Login en Flutter
 
-- [ ] Formulario email/password (UI rojo/blanco).
-- [ ] Secure storage de tokens.
-- [ ] Refresh automático.
-- [ ] Logout.
+- [x] Formulario email/password (UI rojo/blanco).
+- [x] Secure storage de tokens.
+- [x] Refresh automático.
+- [x] Logout.
 
 **Depende de:** A2, B1.
 **Listo cuando:** login real contra la API local; al matar la app, la sesión sigue.
 
 ### B3. Evento actual + slug
 
-- [ ] API: `GET /v1/events/current`, `PATCH /v1/events/:id`.
-- [ ] Flutter: pantalla Evento (nombre, slug, copiar link, QR a pantalla completa).
-- [ ] URL pública: `{PUBLIC_BASE_URL}/e/{slug}`.
+- [x] API: `GET /v1/events/current`, `PATCH /v1/events/:id`.
+- [x] Flutter: pantalla Evento (nombre, slug, copiar link, QR a pantalla completa).
+- [x] URL pública: `{PUBLIC_BASE_URL}/e/{slug}`.
 
 **Depende de:** B1, B2.
 **Listo cuando:** el operador ve y copia `http://localhost:…/e/demo`.
