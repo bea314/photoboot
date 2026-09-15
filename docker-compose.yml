@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: fotoboot-postgres
+    restart: unless-stopped
+    ports:
+      - "55432:5432"
+    environment:
+      POSTGRES_USER: fotoboot
+      POSTGRES_PASSWORD: fotoboot
+      POSTGRES_DB: fotoboot
+    volumes:
+      - fotoboot_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fotoboot -d fotoboot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  fotoboot_pg:

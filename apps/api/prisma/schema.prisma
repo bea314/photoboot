@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model Event {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  publicToken String?
+  startsAt    DateTime?
+  isActive    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  photos      Photo[]
+  printJobs   PrintJob[]
+}
+
+model Photo {
+  id            String         @id @default(cuid())
+  eventId       String
+  event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  clientPhotoId String
+  originalPath  String
+  thumbPath     String
+  takenAt       DateTime
+  printedAt     DateTime?
+  deletedAt     DateTime?
+  createdAt     DateTime       @default(now())
+  printJobItems PrintJobItem[]
+
+  @@unique([eventId, clientPhotoId])
+  @@index([eventId, deletedAt])
+}
+
+enum PrintJobType {
+  photo
+  test
+}
+
+enum PrintJobStatus {
+  queued
+  printed
+  failed
+}
+
+model PrintJob {
+  id             String         @id @default(cuid())
+  eventId        String
+  event          Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  printerProfile String
+  type           PrintJobType   @default(photo)
+  copies         Int            @default(1)
+  status         PrintJobStatus @default(queued)
+  error          String?
+  createdAt      DateTime       @default(now())
+  items          PrintJobItem[]
+}
+
+model PrintJobItem {
+  id         String   @id @default(cuid())
+  printJobId String
+  printJob   PrintJob @relation(fields: [printJobId], references: [id], onDelete: Cascade)
+  photoId    String?
+  photo      Photo?   @relation(fields: [photoId], references: [id], onDelete: SetNull)
+}

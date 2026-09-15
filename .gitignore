@@ -1,0 +1,63 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Data / uploads
+data/
+**/data/
+
+# Node / Nest
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.npm
+.yarn/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Flutter / Dart
+apps/operator/.dart_tool/
+apps/operator/.flutter-plugins
+apps/operator/.flutter-plugins-dependencies
+apps/operator/.packages
+apps/operator/.pub-cache/
+apps/operator/.pub/
+apps/operator/build/
+apps/operator/.android/
+apps/operator/.ios/
+**/*.iml
+**/Doc/api/
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/ephemeral/
+**/ios/ServiceDefinitions.json
+**/macos/Flutter/ephemeral/
+**/linux/flutter/ephemeral/
+**/windows/flutter/ephemeral/
+**/android/.gradle/
+**/android/local.properties
+**/android/**/GeneratedPluginRegistrant.java
+**/android/key.properties
+**/*.jks
+**/.idea/
+**/.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Prisma
+apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+
+# Misc
+*.pem
+.turbo/
+.cache/

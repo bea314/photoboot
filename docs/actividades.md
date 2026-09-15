@@ -23,30 +23,30 @@ Leyenda de estado para ir tachando:
 
 ### A1. Estructura monorepo
 
-- [ ] Crear carpetas `apps/operator`, `apps/api`, `apps/guest-web`, `docs`.
-- [ ] `.gitignore` (Flutter, Node, `.env`, `/data`).
-- [ ] README corto: qué es cada app y cómo levantar en local.
+- [x] Crear carpetas `apps/operator`, `apps/api`, `apps/guest-web`, `docs`.
+- [x] `.gitignore` (Flutter, Node, `.env`, `/data`).
+- [x] README corto: qué es cada app y cómo levantar en local.
 
 **Depende de:** nada.
 **Listo cuando:** `flutter create` en `apps/operator` y Nest arrancan en sus carpetas.
 
 ### A2. App Flutter vacía + tema
 
-- [ ] Proyecto Flutter (Android primero).
-- [ ] Tema rojo/blanco: colores, tipografía, botones grandes.
-- [ ] Navegación esqueleto: Login, Cámara, Galería, Detalle, Gestión, Evento/QR.
+- [x] Proyecto Flutter (Android primero).
+- [x] Tema rojo/blanco: colores, tipografía, botones grandes.
+- [x] Navegación esqueleto: Login, Cámara, Galería, Detalle, Gestión, Evento/QR.
 
 **Depende de:** A1.
 **Listo cuando:** se navega entre pantallas placeholder sin backend.
 
 ### A3. API NestJS + Prisma + Postgres
 
-- [ ] NestJS con Prisma.
-- [ ] Docker Compose: Postgres (y opcionalmente la API).
-- [ ] `.env.example`: `DATABASE_URL`, `JWT_SECRET`, `FILES_ROOT`, `PUBLIC_BASE_URL`.
-- [ ] Modelos: `User`, `Event`, `Photo`, `PrintJob`, `PrintJobItem`.
-- [ ] Seed: un admin + un evento `demo`.
-- [ ] Healthcheck `GET /health`.
+- [x] NestJS con Prisma.
+- [x] Docker Compose: Postgres (y opcionalmente la API).
+- [x] `.env.example`: `DATABASE_URL`, `JWT_SECRET`, `FILES_ROOT`, `PUBLIC_BASE_URL`.
+- [x] Modelos: `User`, `Event`, `Photo`, `PrintJob`, `PrintJobItem`.
+- [x] Seed: un admin + un evento `demo`.
+- [x] Healthcheck `GET /health`.
 
 **Depende de:** A1.
 **Listo cuando:** `prisma migrate` + seed y `/health` responden en local.
