@@ -101,35 +101,40 @@ class OperatorShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onPhotoDetail =
+        GoRouterState.of(context).uri.path.contains('/gallery/detail/');
+
     return Scaffold(
-      extendBody: navigationShell.currentIndex == 0,
+      extendBody: navigationShell.currentIndex == 0 && !onPhotoDetail,
       body: navigationShell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: _onTap,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.photo_camera_outlined),
-            selectedIcon: Icon(Icons.photo_camera),
-            label: 'Cámara',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.photo_library_outlined),
-            selectedIcon: Icon(Icons.photo_library),
-            label: 'Galería',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.print_outlined),
-            selectedIcon: Icon(Icons.print),
-            label: 'Gestión',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.qr_code_2),
-            selectedIcon: Icon(Icons.qr_code_2),
-            label: 'Evento',
-          ),
-        ],
-      ),
+      bottomNavigationBar: onPhotoDetail
+          ? null
+          : NavigationBar(
+              selectedIndex: navigationShell.currentIndex,
+              onDestinationSelected: _onTap,
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.photo_camera_outlined),
+                  selectedIcon: Icon(Icons.photo_camera),
+                  label: 'Cámara',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.photo_library_outlined),
+                  selectedIcon: Icon(Icons.photo_library),
+                  label: 'Galería',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.print_outlined),
+                  selectedIcon: Icon(Icons.print),
+                  label: 'Gestión',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.qr_code_2),
+                  selectedIcon: Icon(Icons.qr_code_2),
+                  label: 'Evento',
+                ),
+              ],
+            ),
     );
   }
 }

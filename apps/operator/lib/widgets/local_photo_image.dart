@@ -66,7 +66,10 @@ class _LocalPhotoImageState extends State<LocalPhotoImage> {
         return Image.memory(
           bytes,
           fit: widget.fit,
+          width: double.infinity,
+          height: double.infinity,
           gaplessPlayback: true,
+          filterQuality: FilterQuality.medium,
         );
       },
     );
