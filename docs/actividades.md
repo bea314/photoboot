@@ -199,15 +199,15 @@ Producto descrito en [`requisitos.md`](./requisitos.md) §5.5–5.6. La implemen
 
 ### Corte A — biblioteca + print con plantilla activa (alcance actual)
 
-- [ ] **Gestión** = hub de plantillas (tab **Plantillas**), no panel de transportes.
-- [ ] **Avanzado** = conexión / transporte / test print (lo que hoy es la pantalla de impresora de Fase D).
-- [ ] Plantillas genéricas JSON **local** (sin Canva completo; sin zip LumaBooth).
-- [ ] **Seed T2 — térmica 80 mm, dos arquetipos:**
-  - [ ] **Ticket QR:** logo + CTA + QR del evento + URL; **sin `photoSlot`**.
-  - [ ] **Ticket foto:** `photoSlot` (fit cover) + texto (evento/marca) + `{{fecha}}`/`{{hora}}` + icono/logo abajo.
+- [x] **Gestión** = hub de plantillas (tab **Plantillas**), no panel de transportes.
+- [x] **Avanzado** = conexión / transporte / test print (lo que hoy es la pantalla de impresora de Fase D).
+- [x] Plantillas genéricas JSON **local** (sin Canva completo; sin zip LumaBooth).
+- [x] **Seed T2 — térmica 80 mm, dos arquetipos:**
+  - [x] **Ticket QR:** logo + CTA + QR del evento + URL; **sin `photoSlot`**.
+  - [x] **Ticket foto:** `photoSlot` (fit cover) + texto (evento/marca) + `{{fecha}}`/`{{hora}}` + icono/logo abajo.
 - [ ] Foto **10×15** variante a color tipo arquetipo 2: **más adelante** (no marcar hecha aquí).
-- [ ] `isActive` **por familia** (térmica vs foto).
-- [ ] Microcopy: **“Usar en este evento”**, badge **Activa**, **“Elige una plantilla para imprimir”**.
+- [x] `isActive` **por familia** (térmica vs foto).
+- [x] Microcopy: **“Usar en este evento”**, badge **Activa**, **“Elige una plantilla para imprimir”**.
 - [ ] Galería/Detalle: Imprimir 1/N con la plantilla activa del papel (ticket foto); warning test-fail → link a Avanzado.
 
 **Depende de:** D1–D3 (pipeline de print), C4.

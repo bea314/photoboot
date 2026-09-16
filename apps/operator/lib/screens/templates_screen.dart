@@ -1,28 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:fotoboot_operator/models/print_template.dart';
 import 'package:fotoboot_operator/printing/printer_profiles.dart';
 import 'package:fotoboot_operator/printing/printer_settings.dart';
+import 'package:fotoboot_operator/services/template_store.dart';
+import 'package:fotoboot_operator/templates/template_preview.dart';
 import 'package:fotoboot_operator/theme/app_colors.dart';
 import 'package:go_router/go_router.dart';
 
-/// Placeholder card model for the Gestión hub (T1).
-/// Real JSON persistence / seed arrives in T2.
-class _TemplateCardData {
-  const _TemplateCardData({
-    required this.name,
-    required this.paperLabel,
-    required this.slotCount,
-    required this.isActive,
-  });
-
-  final String name;
-  final String paperLabel;
-  final int slotCount;
-  final bool isActive;
-}
-
-/// Gestión hub: plantillas de impresión (no transporte / test print).
+/// Gestión hub: plantillas de impresión con biblioteca Hive local (T2).
 class TemplatesScreen extends StatefulWidget {
-  const TemplatesScreen({super.key});
+  const TemplatesScreen({super.key, this.store});
+
+  /// Optional inject for tests; production opens Hive via [TemplateStore.init].
+  final TemplateStore? store;
 
   @override
   State<TemplatesScreen> createState() => _TemplatesScreenState();
@@ -30,23 +20,10 @@ class TemplatesScreen extends StatefulWidget {
 
 class _TemplatesScreenState extends State<TemplatesScreen> {
   final _settings = PrinterSettingsStore();
+  late final TemplateStore _store = widget.store ?? TemplateStore();
 
-  /// UI placeholders until T2 seeds real local templates.
-  final _templates = <_TemplateCardData>[
-    const _TemplateCardData(
-      name: 'Térmica 80 mm · a sangre',
-      paperLabel: 'Térmica 80 mm',
-      slotCount: 1,
-      isActive: true,
-    ),
-    const _TemplateCardData(
-      name: 'Foto 10×15 · center-crop',
-      paperLabel: '10×15 cm',
-      slotCount: 1,
-      isActive: true,
-    ),
-  ];
-
+  List<PrintTemplate> _templates = const [];
+  bool _loadingTemplates = true;
   bool? _lastTestOk;
   String? _endpointLabel;
   String? _profileLabel;
@@ -55,7 +32,20 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
   @override
   void initState() {
     super.initState();
-    _loadPrinterChip();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    await Future.wait([_loadPrinterChip(), _loadTemplates()]);
+  }
+
+  Future<void> _loadTemplates() async {
+    await _store.init();
+    if (!mounted) return;
+    setState(() {
+      _templates = _store.listAll();
+      _loadingTemplates = false;
+    });
   }
 
   Future<void> _loadPrinterChip() async {
@@ -69,6 +59,10 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
       _lastTestOk = testOk;
       _loadingStatus = false;
     });
+  }
+
+  Future<void> _refresh() async {
+    await Future.wait([_loadPrinterChip(), _loadTemplates()]);
   }
 
   String get _chipLabel {
@@ -98,6 +92,42 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
     );
   }
 
+  Future<void> _onUse(PrintTemplate template) async {
+    await _store.setActive(template.id);
+    if (!mounted) return;
+    setState(() => _templates = _store.listAll());
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '“${template.name}” activa para ${template.paper.family == PaperFamily.thermal ? 'térmica' : 'foto'}',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onDuplicate(PrintTemplate template) async {
+    await _store.duplicate(template.id);
+    if (!mounted) return;
+    setState(() => _templates = _store.listAll());
+  }
+
+  TemplatePaper _paperForProfile(PrinterProfile profile) {
+    switch (profile.id) {
+      case PrinterProfileId.thermal80:
+        return const TemplatePaper(
+          widthMm: 80,
+          heightMm: 100,
+          family: PaperFamily.thermal,
+        );
+      case PrinterProfileId.epsonL80504x6:
+        return const TemplatePaper(
+          widthMm: 100,
+          heightMm: 150,
+          family: PaperFamily.photo,
+        );
+    }
+  }
+
   Future<void> _showNewTemplateSheet() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -118,8 +148,8 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'El asistente y el editor llegan en cortes siguientes. '
-                  'Por ahora solo eliges el papel.',
+                  'Elige el papel. Se crea una plantilla genérica '
+                  '(ticket foto en térmica, 1 hueco en foto).',
                   style: TextStyle(color: AppColors.grey, fontSize: 15),
                 ),
                 const SizedBox(height: 20),
@@ -129,23 +159,18 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
                     child: SizedBox(
                       height: 52,
                       child: OutlinedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           Navigator.pop(context);
-                          setState(() {
-                            _templates.insert(
-                              0,
-                              _TemplateCardData(
-                                name: 'Plantilla ${p.frameLabel}',
-                                paperLabel: p.label,
-                                slotCount: 1,
-                                isActive: false,
-                              ),
-                            );
-                          });
+                          final created = await _store.createGeneric(
+                            paper: _paperForProfile(p),
+                            name: 'Plantilla ${p.frameLabel}',
+                          );
+                          if (!mounted) return;
+                          setState(() => _templates = _store.listAll());
                           ScaffoldMessenger.of(this.context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Plantilla de ${p.label} añadida (local, sin guardar aún)',
+                                '“${created.name}” guardada en el dispositivo',
                               ),
                             ),
                           );
@@ -176,6 +201,7 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final crossAxisCount = width > 900 ? 3 : (width > 560 ? 2 : 1);
+    final hasActive = _templates.any((t) => t.isActive);
 
     return Scaffold(
       appBar: AppBar(
@@ -195,7 +221,7 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
       ),
       body: RefreshIndicator(
         color: AppColors.red,
-        onRefresh: _loadPrinterChip,
+        onRefresh: _refresh,
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
@@ -236,6 +262,20 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
                 ),
               ),
             ),
+            if (!_loadingTemplates && !hasActive && _templates.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                  child: Text(
+                    'Elige una plantilla para imprimir',
+                    style: TextStyle(
+                      color: AppColors.grey.withValues(alpha: 0.95),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
             if (_lastTestOk == false)
               SliverToBoxAdapter(
                 child: Padding(
@@ -270,7 +310,12 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
                   ),
                 ),
               ),
-            if (_templates.isEmpty)
+            if (_loadingTemplates)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_templates.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: Padding(
@@ -295,7 +340,7 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
                       ),
                       const SizedBox(height: 10),
                       const Text(
-                        'Crea una plantilla genérica para empezar a imprimir.',
+                        'Elige una plantilla para imprimir',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: AppColors.grey, fontSize: 16),
                       ),
@@ -322,24 +367,12 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
                     (context, index) {
                       final t = _templates[index];
                       return _TemplateCard(
-                        data: t,
-                        onUse: () => _showComingSoon('Usar en este evento'),
+                        template: t,
+                        onUse: () => _onUse(t),
                         onEdit: () => _showComingSoon(
                           'Editar (editor en Corte B)',
                         ),
-                        onDuplicate: () {
-                          setState(() {
-                            _templates.insert(
-                              index + 1,
-                              _TemplateCardData(
-                                name: '${t.name} (copia)',
-                                paperLabel: t.paperLabel,
-                                slotCount: t.slotCount,
-                                isActive: false,
-                              ),
-                            );
-                          });
-                        },
+                        onDuplicate: () => _onDuplicate(t),
                       );
                     },
                     childCount: _templates.length,
@@ -355,19 +388,20 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
 
 class _TemplateCard extends StatelessWidget {
   const _TemplateCard({
-    required this.data,
+    required this.template,
     required this.onUse,
     required this.onEdit,
     required this.onDuplicate,
   });
 
-  final _TemplateCardData data;
+  final PrintTemplate template;
   final VoidCallback onUse;
   final VoidCallback onEdit;
   final VoidCallback onDuplicate;
 
   @override
   Widget build(BuildContext context) {
+    final slots = template.slotCount;
     return Material(
       color: AppColors.white,
       elevation: 1,
@@ -380,37 +414,34 @@ class _TemplateCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: ColoredBox(
-                color: AppColors.surface,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CustomPaint(painter: _PaperPreviewPainter()),
-                    if (data.isActive)
-                      Positioned(
-                        top: 10,
-                        left: 10,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.red,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            'Activa',
-                            style: TextStyle(
-                              color: AppColors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                            ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  TemplatePreviewThumb(template: template),
+                  if (template.isActive)
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.red,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'Activa',
+                          style: TextStyle(
+                            color: AppColors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
                           ),
                         ),
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
             ),
             Padding(
@@ -419,7 +450,7 @@ class _TemplateCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    data.name,
+                    template.name,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -430,8 +461,8 @@ class _TemplateCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${data.paperLabel} · ${data.slotCount} '
-                    '${data.slotCount == 1 ? 'hueco' : 'huecos'}',
+                    '${template.paper.label} · $slots '
+                    '${slots == 1 ? 'hueco' : 'huecos'}',
                     style: const TextStyle(
                       color: AppColors.grey,
                       fontSize: 14,
@@ -479,49 +510,4 @@ class _TemplateCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _PaperPreviewPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final border = Paint()
-      ..color = AppColors.red.withValues(alpha: 0.55)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-    final fill = Paint()..color = AppColors.white;
-    final margin = size.shortestSide * 0.12;
-    final rect = Rect.fromLTWH(
-      margin,
-      margin,
-      size.width - margin * 2,
-      size.height - margin * 2,
-    );
-    canvas.drawRect(rect, fill);
-    canvas.drawRect(rect, border);
-
-    final slot = Rect.fromLTWH(
-      rect.left + rect.width * 0.08,
-      rect.top + rect.height * 0.08,
-      rect.width * 0.84,
-      rect.height * 0.84,
-    );
-    final slotPaint = Paint()
-      ..color = AppColors.red.withValues(alpha: 0.08)
-      ..style = PaintingStyle.fill;
-    final slotBorder = Paint()
-      ..color = AppColors.red.withValues(alpha: 0.35)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(slot, const Radius.circular(4)),
-      slotPaint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(slot, const Radius.circular(4)),
-      slotBorder,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
