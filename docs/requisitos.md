@@ -118,6 +118,8 @@ El VPS **no imprime**. Solo registra jobs. El dispositivo del operador es el que
 
 La UX de “Gestión de impresora” se parte en dos superficies. **Gestión no es el panel de transportes.**
 
+Modelo mental de sector (referencia, no formato a copiar): en flujos tipo booth las plantillas viven en el **setup del evento** (elegir layout, ajuste ligero, cambiar papel/layout sin rediseñar, probar con la cámara), no en una pantalla de debug de impresora. Ver [Import & Edit LumaBooth Templates](https://photoboothlayouts.com/how-to-import-edit-lumabooth-templates-on-mac/) como inspiración de ese flujo. **No** adoptamos el formato zip LumaBooth/DSLRBooth; nuestras plantillas son JSON local genérico (Corte A) y edición propia más adelante (Corte B).
+
 #### Gestión — hub de plantillas (tab **Plantillas**)
 
 - Biblioteca de plantillas del dispositivo (seed + las que se añadan después).
@@ -125,6 +127,7 @@ La UX de “Gestión de impresora” se parte en dos superficies. **Gestión no 
 - Acción **“Usar en este evento”** para marcar activa la plantilla elegida (por familia térmica vs foto).
 - Empty / guía: **“Elige una plantilla para imprimir”** cuando aún no hay activa o hay que cambiar.
 - Desde aquí se elige *qué* se imprime encima del papel; no se empareja hardware.
+- Cambiar papel/familia o plantilla activa **sin** rediseñar layout a mano (Corte A: elegir otra del seed/biblioteca).
 
 #### Avanzado — conexión, transporte y test print
 
