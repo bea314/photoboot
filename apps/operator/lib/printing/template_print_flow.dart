@@ -140,10 +140,12 @@ class TemplatePrintFlow {
         slotBytes.add(bytes);
       }
 
+      final assetBytes = await _templates.loadAssetsFor(template);
       final pagePng = await _composer.composePng(
         template: template,
         context: printContext,
         photoBytes: slotBytes,
+        assetBytes: assetBytes,
         widthPx: profile.thermalDotsWidth ?? 576,
       );
       composedRequests.add(

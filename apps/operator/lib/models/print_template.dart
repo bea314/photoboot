@@ -1,4 +1,4 @@
-/// Local print-template JSON model (Corte A / T2).
+/// Local print-template JSON model (Corte A / T2 + Corte B editor).
 /// Coordinates are normalized 0–1 relative to the paper rectangle.
 library;
 
@@ -18,7 +18,9 @@ enum TemplateLayerType {
   photoSlot,
   image,
   text,
-  qr;
+  qr,
+  shape,
+  background;
 
   static TemplateLayerType fromName(String raw) {
     return TemplateLayerType.values.firstWhere(
@@ -81,14 +83,27 @@ class TemplateLayer {
     required this.y,
     required this.w,
     required this.h,
+    this.name,
     this.fit,
     this.text,
     this.role,
     this.valueKey,
+    this.slotIndex,
+    this.locked = false,
+    this.visible = true,
+    this.opacity = 1,
+    this.cornerRadius,
+    this.fillColor,
+    this.strokeColor,
+    this.assetKey,
+    this.shapeKind,
   });
 
   final String id;
   final TemplateLayerType type;
+
+  /// Optional display name in the layer list.
+  final String? name;
 
   /// Normalized rect (0–1 of paper).
   final double x;
@@ -96,7 +111,7 @@ class TemplateLayer {
   final double w;
   final double h;
 
-  /// photoSlot only — typically `cover`.
+  /// photoSlot / image / background — `cover` | `contain` | `fill`.
   final String? fit;
 
   /// text layers (may include `{{fecha}}` / `{{hora}}` placeholders).
@@ -108,6 +123,97 @@ class TemplateLayer {
   /// qr layers — e.g. `eventUrl`.
   final String? valueKey;
 
+  /// photoSlot only — 1-based Foto index. Null = order of appearance.
+  final int? slotIndex;
+
+  final bool locked;
+  final bool visible;
+
+  /// 0–1.
+  final double opacity;
+
+  /// Corner radius as fraction of the shorter side (0–0.5).
+  final double? cornerRadius;
+
+  /// Hex `#RRGGBB` or `#AARRGGBB`.
+  final String? fillColor;
+  final String? strokeColor;
+
+  /// Key in [TemplateAssetStore] for background / image bytes.
+  final String? assetKey;
+
+  /// shape only — `rect` | `circle`.
+  final String? shapeKind;
+
+  String get displayName {
+    if (name != null && name!.trim().isNotEmpty) return name!.trim();
+    switch (type) {
+      case TemplateLayerType.photoSlot:
+        final i = slotIndex;
+        return i == null ? 'Hueco de foto' : 'Foto $i';
+      case TemplateLayerType.image:
+        return role == 'logo' ? 'Logo' : 'Imagen';
+      case TemplateLayerType.text:
+        return 'Texto';
+      case TemplateLayerType.qr:
+        return 'QR';
+      case TemplateLayerType.shape:
+        return shapeKind == 'circle' ? 'Círculo' : 'Rectángulo';
+      case TemplateLayerType.background:
+        return 'Fondo';
+    }
+  }
+
+  TemplateLayer copyWith({
+    String? id,
+    TemplateLayerType? type,
+    String? name,
+    double? x,
+    double? y,
+    double? w,
+    double? h,
+    String? fit,
+    String? text,
+    String? role,
+    String? valueKey,
+    int? slotIndex,
+    bool? locked,
+    bool? visible,
+    double? opacity,
+    double? cornerRadius,
+    String? fillColor,
+    String? strokeColor,
+    String? assetKey,
+    String? shapeKind,
+    bool clearSlotIndex = false,
+    bool clearText = false,
+    bool clearAssetKey = false,
+    bool clearFit = false,
+  }) {
+    return TemplateLayer(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      name: name ?? this.name,
+      x: x ?? this.x,
+      y: y ?? this.y,
+      w: w ?? this.w,
+      h: h ?? this.h,
+      fit: clearFit ? null : (fit ?? this.fit),
+      text: clearText ? null : (text ?? this.text),
+      role: role ?? this.role,
+      valueKey: valueKey ?? this.valueKey,
+      slotIndex: clearSlotIndex ? null : (slotIndex ?? this.slotIndex),
+      locked: locked ?? this.locked,
+      visible: visible ?? this.visible,
+      opacity: opacity ?? this.opacity,
+      cornerRadius: cornerRadius ?? this.cornerRadius,
+      fillColor: fillColor ?? this.fillColor,
+      strokeColor: strokeColor ?? this.strokeColor,
+      assetKey: clearAssetKey ? null : (assetKey ?? this.assetKey),
+      shapeKind: shapeKind ?? this.shapeKind,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -116,10 +222,20 @@ class TemplateLayer {
       'y': y,
       'w': w,
       'h': h,
+      if (name != null) 'name': name,
       if (fit != null) 'fit': fit,
       if (text != null) 'text': text,
       if (role != null) 'role': role,
       if (valueKey != null) 'valueKey': valueKey,
+      if (slotIndex != null) 'slotIndex': slotIndex,
+      if (locked) 'locked': locked,
+      if (!visible) 'visible': visible,
+      if (opacity != 1) 'opacity': opacity,
+      if (cornerRadius != null) 'cornerRadius': cornerRadius,
+      if (fillColor != null) 'fillColor': fillColor,
+      if (strokeColor != null) 'strokeColor': strokeColor,
+      if (assetKey != null) 'assetKey': assetKey,
+      if (shapeKind != null) 'shapeKind': shapeKind,
     };
   }
 
@@ -127,6 +243,7 @@ class TemplateLayer {
     return TemplateLayer(
       id: map['id'] as String,
       type: TemplateLayerType.fromName(map['type'] as String? ?? 'text'),
+      name: map['name'] as String?,
       x: (map['x'] as num).toDouble(),
       y: (map['y'] as num).toDouble(),
       w: (map['w'] as num).toDouble(),
@@ -135,6 +252,15 @@ class TemplateLayer {
       text: map['text'] as String?,
       role: map['role'] as String?,
       valueKey: map['valueKey'] as String?,
+      slotIndex: (map['slotIndex'] as num?)?.toInt(),
+      locked: map['locked'] as bool? ?? false,
+      visible: map['visible'] as bool? ?? true,
+      opacity: (map['opacity'] as num?)?.toDouble() ?? 1,
+      cornerRadius: (map['cornerRadius'] as num?)?.toDouble(),
+      fillColor: map['fillColor'] as String?,
+      strokeColor: map['strokeColor'] as String?,
+      assetKey: map['assetKey'] as String?,
+      shapeKind: map['shapeKind'] as String?,
     );
   }
 }
@@ -147,6 +273,7 @@ class PrintTemplate {
     required this.paper,
     required this.layers,
     this.isActive = false,
+    this.dpi = 300,
   });
 
   final String id;
@@ -157,8 +284,29 @@ class PrintTemplate {
   /// True when this template is the active one for [paper.family].
   final bool isActive;
 
+  /// Raster hint (foto default 300; térmica may use 203).
+  final int dpi;
+
   int get slotCount =>
       layers.where((l) => l.type == TemplateLayerType.photoSlot).length;
+
+  /// photoSlots ordered by [TemplateLayer.slotIndex] then creation order.
+  List<TemplateLayer> get orderedPhotoSlots {
+    final slots = layers
+        .where((l) => l.type == TemplateLayerType.photoSlot)
+        .toList();
+    final indexed = <TemplateLayer>[];
+    final unindexed = <TemplateLayer>[];
+    for (final s in slots) {
+      if (s.slotIndex != null) {
+        indexed.add(s);
+      } else {
+        unindexed.add(s);
+      }
+    }
+    indexed.sort((a, b) => a.slotIndex!.compareTo(b.slotIndex!));
+    return [...indexed, ...unindexed];
+  }
 
   PrintTemplate copyWith({
     String? id,
@@ -166,6 +314,7 @@ class PrintTemplate {
     TemplatePaper? paper,
     List<TemplateLayer>? layers,
     bool? isActive,
+    int? dpi,
   }) {
     return PrintTemplate(
       id: id ?? this.id,
@@ -173,6 +322,7 @@ class PrintTemplate {
       paper: paper ?? this.paper,
       layers: layers ?? this.layers,
       isActive: isActive ?? this.isActive,
+      dpi: dpi ?? this.dpi,
     );
   }
 
@@ -183,6 +333,7 @@ class PrintTemplate {
       'name': name,
       'paper': paper.toMap(),
       'layers': layers.map((l) => l.toMap()).toList(),
+      if (dpi != 300) 'dpi': dpi,
     };
   }
 
@@ -195,9 +346,13 @@ class PrintTemplate {
         Map<String, dynamic>.from(map['paper'] as Map),
       ),
       layers: rawLayers
-          .map((raw) => TemplateLayer.fromMap(Map<String, dynamic>.from(raw as Map)))
+          .map(
+            (raw) =>
+                TemplateLayer.fromMap(Map<String, dynamic>.from(raw as Map)),
+          )
           .toList(),
       isActive: isActive,
+      dpi: (map['dpi'] as num?)?.toInt() ?? 300,
     );
   }
 }

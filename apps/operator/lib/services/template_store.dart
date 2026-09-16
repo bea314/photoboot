@@ -1,11 +1,16 @@
+import 'dart:typed_data';
+
 import 'package:fotoboot_operator/models/print_template.dart';
+import 'package:fotoboot_operator/services/template_asset_store.dart';
 import 'package:fotoboot_operator/templates/template_seed.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 
-/// Hive-backed local template library (T2).
+/// Hive-backed local template library (T2 + Corte B drafts).
 class TemplateStore {
-  TemplateStore({Uuid? uuid}) : _uuid = uuid ?? const Uuid();
+  TemplateStore({Uuid? uuid, TemplateAssetStore? assets})
+      : _uuid = uuid ?? const Uuid(),
+        assets = assets ?? TemplateAssetStore();
 
   static const templatesBoxName = 'templates';
   static const settingsBoxName = 'template_settings';
@@ -14,6 +19,7 @@ class TemplateStore {
   static const _seededKey = 'seeded_v1';
 
   final Uuid _uuid;
+  final TemplateAssetStore assets;
 
   late Box _templates;
   late Box _settings;
@@ -27,6 +33,7 @@ class TemplateStore {
     _settings = Hive.isBoxOpen(settingsBoxName)
         ? Hive.box(settingsBoxName)
         : await Hive.openBox(settingsBoxName);
+    await assets.init();
     await ensureSeeded();
     _ready = true;
   }
@@ -134,6 +141,66 @@ class TemplateStore {
     );
     await upsert(created);
     return getById(id)!;
+  }
+
+  /// Mode B — blank canvas (optionally with a starter layout later in editor).
+  Future<PrintTemplate> createBlank({
+    required TemplatePaper paper,
+    required String name,
+  }) async {
+    final id = _uuid.v4();
+    final created = PrintTemplate(
+      id: id,
+      name: name,
+      paper: paper,
+      layers: const [],
+      dpi: paper.family == PaperFamily.thermal ? 203 : 300,
+    );
+    await upsert(created);
+    return getById(id)!;
+  }
+
+  /// Mode A — background image + empty slots for the operator to draw.
+  Future<PrintTemplate> createWithBackground({
+    required TemplatePaper paper,
+    required String name,
+    required Uint8List backgroundBytes,
+  }) async {
+    final id = _uuid.v4();
+    final assetKey = await assets.putBytes(backgroundBytes);
+    final bg = TemplateLayer(
+      id: _uuid.v4(),
+      type: TemplateLayerType.background,
+      x: 0,
+      y: 0,
+      w: 1,
+      h: 1,
+      fit: 'contain',
+      assetKey: assetKey,
+      locked: true,
+      role: 'background',
+      name: 'Fondo',
+    );
+    final created = PrintTemplate(
+      id: id,
+      name: name,
+      paper: paper,
+      layers: [bg],
+      dpi: paper.family == PaperFamily.thermal ? 203 : 300,
+    );
+    await upsert(created);
+    return getById(id)!;
+  }
+
+  Future<Map<String, Uint8List>> loadAssetsFor(PrintTemplate template) async {
+    final out = <String, Uint8List>{};
+    for (final layer in template.layers) {
+      final key = layer.assetKey;
+      if (key == null || out.containsKey(key)) continue;
+      final bytes = await assets.read(key);
+      if (bytes != null) out[key] = bytes;
+    }
+    return out;
   }
 
   Future<void> delete(String id) => _templates.delete(id);

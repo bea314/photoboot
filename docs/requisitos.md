@@ -105,32 +105,41 @@ El VPS **no imprime**. Solo registra jobs. El dispositivo del operador es el que
 - Si no hay conexión de impresora: aviso tipo **“No hay conexión… Revísala en Avanzado”** (enlace a Avanzado).
 - Si el último test print falló: warning en Galería/Detalle con enlace a **Avanzado** (no a un hub de transportes en Gestión).
 
-**Plantillas (Corte A — alcance de producto):**
+**Plantillas (Corte A — hecho; Corte B — editor):**
 
-- Biblioteca local de plantillas genéricas en JSON (sin editor canvas ni Canva completo; Corte A/B ligero no lo exige).
+- Biblioteca local de plantillas genéricas en JSON (sin Canva completo; sin zip LumaBooth).
 - **Seeds térmicos 80 mm (T2) — dos arquetipos:**
   1. **Ticket QR:** logo + CTA + QR del evento + URL. **Sin `photoSlot`.** Sirve para compartir el link sin imprimir foto.
   2. **Ticket foto:** `photoSlot` (fit **cover**) + texto (evento/marca) + timestamp con placeholders `{{fecha}}` / `{{hora}}` + icono/logo abajo.
-- Foto **10×15:** variante a color tipo arquetipo 2 (photoSlot + texto/marca) **más adelante** — no forma parte del seed mínimo hecho de Corte A.
+- Foto **10×15:** se puede crear en el editor (Corte B); no hay seed mínimo extra.
 - `isActive` **por familia** (una activa para térmica, otra para foto cuando exista), no un único global.
 - Al imprimir desde Galería/Detalle (ticket foto / 10×15), se usa la plantilla activa con `photoSlot`. El ticket QR se puede disparar desde el flujo de evento/compartir sin foto.
 
-**Fuera de este corte (Corte B — pendiente):** editor canvas, import de fondo (p. ej. Canva u otro asset), capas (`photoSlot` / `image` / `text` / `QR` / `shape`), drag de slots; rotación fuera del MVP. Edición ligera sí; Canva completo no es requisito de Corte A. Los docs no asumen que el editor exista hasta que haya PR de implementación. **No** adoptamos zip LumaBooth.
+**Corte B — editor de plantillas (MVP):**
+
+- Gestión → **Editar** abre el editor real; **Nueva** es un wizard corto (papel + Modo A/B).
+- **Modo A:** subir fondo JPEG/PNG (export Canva) + dibujar `photoSlot`s.
+- **Modo B:** capas desde cero (`photoSlot`, `image`, `text`, `QR`, `shape`, `background`).
+- Mismo modelo JSON T2 y el **mismo renderer** (`TemplateLayoutPainter` / `TemplateComposer`) en editor preview e impresión.
+- Gestos: seleccionar, mover, resize handles, pinch zoom del viewport, undo/redo, autosave borrador.
+- Tokens de texto: `{{evento}}` `{{fecha}}` `{{hora}}` `{{eventUrl}}`. QR usa `eventUrl` del evento.
+- **Guardar** / **Usar en este evento** (activar por familia). Vista previa con fotos de galería; **no** imprime desde el editor.
+- Rotación libre: fuera de MVP. Multi-select / Canva completo / zip LumaBooth / test print en el editor: fuera.
 
 ### 5.6 Gestión (plantillas) y Avanzado (impresora)
 
 La UX de “Gestión de impresora” se parte en dos superficies. **Gestión no es el panel de transportes.**
 
-Modelo mental de sector (referencia, no formato a copiar): en flujos tipo booth las plantillas viven en el **setup del evento** (elegir layout, ajuste ligero, cambiar papel/layout sin rediseñar, probar con la cámara), no en una pantalla de debug de impresora. Ver [Import & Edit LumaBooth Templates](https://photoboothlayouts.com/how-to-import-edit-lumabooth-templates-on-mac/) como inspiración de ese flujo. **No** adoptamos el formato zip LumaBooth/DSLRBooth; nuestras plantillas son JSON local genérico (Corte A) y edición propia más adelante (Corte B).
+Modelo mental de sector (referencia, no formato a copiar): en flujos tipo booth las plantillas viven en el **setup del evento** (elegir layout, ajuste ligero, cambiar papel/layout sin rediseñar, probar con la cámara), no en una pantalla de debug de impresora. Ver [Import & Edit LumaBooth Templates](https://photoboothlayouts.com/how-to-import-edit-lumabooth-templates-on-mac/) como inspiración de ese flujo. **No** adoptamos el formato zip LumaBooth/DSLRBooth; nuestras plantillas son JSON local genérico (Corte A) con editor propio (Corte B).
 
 #### Gestión — hub de plantillas (tab **Plantillas**)
 
-- Biblioteca de plantillas del dispositivo (seed + las que se añadan después).
+- Biblioteca de plantillas del dispositivo (seed + las creadas en el editor).
 - Lista/grid con preview; badge **Activa** en la plantilla en uso por familia.
 - Acción **“Usar en este evento”** para marcar activa la plantilla elegida (por familia térmica vs foto).
 - Empty / guía: **“Elige una plantilla para imprimir”** cuando aún no hay activa o hay que cambiar.
 - Desde aquí se elige *qué* se imprime encima del papel; no se empareja hardware.
-- Cambiar papel/familia o plantilla activa **sin** rediseñar layout a mano (Corte A: elegir otra del seed/biblioteca).
+- **Editar** abre el editor canvas; **Nueva** lanza el wizard (Modo A fondo+slots / Modo B capas).
 
 #### Avanzado — conexión, transporte y test print
 

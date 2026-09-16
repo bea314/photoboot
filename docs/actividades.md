@@ -132,7 +132,7 @@ Leyenda de estado para ir tachando:
 
 ## Fase D — Impresión (primero térmica)
 
-> Recorte UX (ver [`requisitos.md`](./requisitos.md) §5.5–5.6): **Imprimir 1/N vive en Galería/Detalle**. **Gestión** = biblioteca de plantillas (hub). **Avanzado** = conexión / transporte / test print. El pipeline de Fase D (perfiles, raster, PrintJob) ya está en main; el hub de plantillas es **Corte A** (abajo, PRs aparte). No marcar el editor (Corte B) como hecho.
+> Recorte UX (ver [`requisitos.md`](./requisitos.md) §5.5–5.6): **Imprimir 1/N vive en Galería/Detalle**. **Gestión** = biblioteca de plantillas (hub + editor Corte B). **Avanzado** = conexión / transporte / test print. El pipeline de Fase D (perfiles, raster, PrintJob) ya está en main.
 
 ### D1. Perfiles y preview
 
@@ -195,9 +195,9 @@ Leyenda de estado para ir tachando:
 
 ## Plantillas — Corte A / Corte B
 
-Producto descrito en [`requisitos.md`](./requisitos.md) §5.5–5.6. La implementación de código (T1/T2/T3) puede ir en **PRs separados**; este plan fija el alcance. **No fingir que el editor existe.**
+Producto descrito en [`requisitos.md`](./requisitos.md) §5.5–5.6. La implementación de código (T1/T2/T3 + Corte B) puede ir en PRs separados hacia `gestion`.
 
-### Corte A — biblioteca + print con plantilla activa (alcance actual)
+### Corte A — biblioteca + print con plantilla activa (hecho)
 
 - [x] **Gestión** = hub de plantillas (tab **Plantillas**), no panel de transportes.
 - [x] **Avanzado** = conexión / transporte / test print (lo que hoy es la pantalla de impresora de Fase D).
@@ -205,7 +205,7 @@ Producto descrito en [`requisitos.md`](./requisitos.md) §5.5–5.6. La implemen
 - [x] **Seed T2 — térmica 80 mm, dos arquetipos:**
   - [x] **Ticket QR:** logo + CTA + QR del evento + URL; **sin `photoSlot`**.
   - [x] **Ticket foto:** `photoSlot` (fit cover) + texto (evento/marca) + `{{fecha}}`/`{{hora}}` + icono/logo abajo.
-- [ ] Foto **10×15** variante a color tipo arquetipo 2: **más adelante** (no marcar hecha aquí).
+- [ ] Foto **10×15** seed de color tipo arquetipo 2: opcional (el editor ya permite crearlas).
 - [x] `isActive` **por familia** (térmica vs foto).
 - [x] Microcopy: **“Usar en este evento”**, badge **Activa**, **“Elige una plantilla para imprimir”**.
 - [x] Galería/Detalle: Imprimir 1/N con la plantilla activa del papel (ticket foto); warning test-fail → link a Avanzado.
@@ -213,16 +213,18 @@ Producto descrito en [`requisitos.md`](./requisitos.md) §5.5–5.6. La implemen
 **Depende de:** D1–D3 (pipeline de print), C4.
 **Listo cuando:** el operador elige entre ticket QR y ticket foto en Gestión, imprime desde Galería/Detalle con la activa (foto), y el hardware se configura solo en Avanzado.
 
-### Corte B — editor (pendiente; no marcar [x])
+### Corte B — editor (hecho en `gestion`)
 
-- [ ] Editor canvas (edición ligera; Canva completo no es requisito).
-- [ ] Import de fondo / asset (p. ej. Canva u otro) — no zip LumaBooth.
-- [ ] Capas: `photoSlot` / `image` / `text` / `QR` / `shape`.
-- [ ] Drag de slots.
-- Rotación: **fuera del MVP** (ni siquiera en Corte B obligatorio).
+- [x] Editor canvas (edición ligera; Canva completo no es requisito).
+- [x] Import de fondo / asset (JPEG/PNG, p. ej. Canva) — no zip LumaBooth.
+- [x] Capas: `photoSlot` / `image` / `text` / `QR` / `shape` / `background`.
+- [x] Drag de slots + resize handles; pinch zoom viewport; undo/redo; autosave.
+- [x] Wizard Nueva (papel 58/80, 10×15, carta/A4/custom) → Modo A o B.
+- [x] Preview con fotos de galería; Guardar / Usar en este evento; mismo composer T3.
+- Rotación: **fuera del MVP** (ni siquiera obligatoria en Corte B).
 
 **Depende de:** Corte A.
-**Listo cuando:** se puede componer una plantilla en app sin tocar JSON a mano. Hasta entonces, solo seed T2 (ticket QR + ticket foto) + JSON local.
+**Listo cuando:** se puede componer una plantilla en app sin tocar JSON a mano y Detalle/Galería imprimen con ella.
 
 ---
 
@@ -296,7 +298,7 @@ A1 → A2 + A3
      → F1 → F2
      → D5                     ← L8050 cuando el print ya esté sólido
      → E3                     ← VPS cuando local ya funcione
-     → Corte B (editor)       ← después; no bloquear el primer ensayo
+     → Corte B (editor)       ← hecho en gestion; no merge a main aún
 ```
 
 ## Criterio para no desviarse

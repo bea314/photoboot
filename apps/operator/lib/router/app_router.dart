@@ -5,6 +5,7 @@ import 'package:fotoboot_operator/screens/gallery_screen.dart';
 import 'package:fotoboot_operator/screens/login_screen.dart';
 import 'package:fotoboot_operator/screens/photo_detail_screen.dart';
 import 'package:fotoboot_operator/screens/printer_screen.dart';
+import 'package:fotoboot_operator/screens/template_editor_screen.dart';
 import 'package:fotoboot_operator/screens/templates_screen.dart';
 import 'package:fotoboot_operator/services/auth_controller.dart';
 import 'package:fotoboot_operator/services/photo_controller.dart';
@@ -75,6 +76,21 @@ GoRouter createAppRouter(AuthController auth, PhotoController photos) {
                     name: 'templates-printer',
                     builder: (context, state) => PrinterScreen(auth: auth),
                   ),
+                  GoRoute(
+                    path: 'edit/:templateId',
+                    name: 'templates-edit',
+                    builder: (context, state) {
+                      final id = state.pathParameters['templateId']!;
+                      final prompt =
+                          state.uri.queryParameters['promptSlots'] == '1';
+                      return TemplateEditorScreen(
+                        templateId: id,
+                        photos: photos,
+                        api: photos.api,
+                        promptDrawSlots: prompt,
+                      );
+                    },
+                  ),
                 ],
               ),
             ],
@@ -111,38 +127,40 @@ class OperatorShell extends StatelessWidget {
     final path = GoRouterState.of(context).uri.path;
     final onPhotoDetail = path.contains('/gallery/detail/');
     final onAdvancedPrinter = path == '/templates/printer';
+    final onTemplateEditor = path.contains('/templates/edit/');
 
     return Scaffold(
       extendBody: navigationShell.currentIndex == 0 && !onPhotoDetail,
       body: navigationShell,
-      bottomNavigationBar: (onPhotoDetail || onAdvancedPrinter)
-          ? null
-          : NavigationBar(
-              selectedIndex: navigationShell.currentIndex,
-              onDestinationSelected: _onTap,
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.photo_camera_outlined),
-                  selectedIcon: Icon(Icons.photo_camera),
-                  label: 'Cámara',
+      bottomNavigationBar:
+          (onPhotoDetail || onAdvancedPrinter || onTemplateEditor)
+              ? null
+              : NavigationBar(
+                  selectedIndex: navigationShell.currentIndex,
+                  onDestinationSelected: _onTap,
+                  destinations: const [
+                    NavigationDestination(
+                      icon: Icon(Icons.photo_camera_outlined),
+                      selectedIcon: Icon(Icons.photo_camera),
+                      label: 'Cámara',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.photo_library_outlined),
+                      selectedIcon: Icon(Icons.photo_library),
+                      label: 'Galería',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.dashboard_customize_outlined),
+                      selectedIcon: Icon(Icons.dashboard_customize),
+                      label: 'Gestión',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.qr_code_2),
+                      selectedIcon: Icon(Icons.qr_code_2),
+                      label: 'Evento',
+                    ),
+                  ],
                 ),
-                NavigationDestination(
-                  icon: Icon(Icons.photo_library_outlined),
-                  selectedIcon: Icon(Icons.photo_library),
-                  label: 'Galería',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.dashboard_customize_outlined),
-                  selectedIcon: Icon(Icons.dashboard_customize),
-                  label: 'Gestión',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.qr_code_2),
-                  selectedIcon: Icon(Icons.qr_code_2),
-                  label: 'Evento',
-                ),
-              ],
-            ),
     );
   }
 }

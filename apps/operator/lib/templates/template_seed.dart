@@ -75,6 +75,7 @@ abstract final class TemplateSeed {
           w: 0.88,
           h: 0.58,
           fit: 'cover',
+          slotIndex: 1,
         ),
         TemplateLayer(
           id: 'brand',
@@ -135,6 +136,7 @@ abstract final class TemplateSeed {
             w: 0.88,
             h: 0.58,
             fit: 'cover',
+            slotIndex: 1,
           ),
           TemplateLayer(
             id: 'brand',
@@ -182,6 +184,7 @@ abstract final class TemplateSeed {
           w: 0.92,
           h: 0.92,
           fit: 'cover',
+          slotIndex: 1,
         ),
       ],
     );
