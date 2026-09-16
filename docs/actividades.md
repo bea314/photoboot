@@ -201,24 +201,28 @@ Producto descrito en [`requisitos.md`](./requisitos.md) §5.5–5.6. La implemen
 
 - [ ] **Gestión** = hub de plantillas (tab **Plantillas**), no panel de transportes.
 - [ ] **Avanzado** = conexión / transporte / test print (lo que hoy es la pantalla de impresora de Fase D).
-- [ ] Plantillas genéricas JSON **local**; seed térmica **80** + foto **10×15**, cada una con **1 slot** center-crop.
+- [ ] Plantillas genéricas JSON **local** (sin Canva completo; sin zip LumaBooth).
+- [ ] **Seed T2 — térmica 80 mm, dos arquetipos:**
+  - [ ] **Ticket QR:** logo + CTA + QR del evento + URL; **sin `photoSlot`**.
+  - [ ] **Ticket foto:** `photoSlot` (fit cover) + texto (evento/marca) + `{{fecha}}`/`{{hora}}` + icono/logo abajo.
+- [ ] Foto **10×15** variante a color tipo arquetipo 2: **más adelante** (no marcar hecha aquí).
 - [ ] `isActive` **por familia** (térmica vs foto).
 - [ ] Microcopy: **“Usar en este evento”**, badge **Activa**, **“Elige una plantilla para imprimir”**.
-- [ ] Galería/Detalle: Imprimir 1/N con la plantilla activa del papel; warning test-fail → link a Avanzado.
+- [ ] Galería/Detalle: Imprimir 1/N con la plantilla activa del papel (ticket foto); warning test-fail → link a Avanzado.
 
 **Depende de:** D1–D3 (pipeline de print), C4.
-**Listo cuando:** el operador elige plantilla en Gestión, imprime desde Galería/Detalle con esa activa, y el hardware se configura solo en Avanzado.
+**Listo cuando:** el operador elige entre ticket QR y ticket foto en Gestión, imprime desde Galería/Detalle con la activa (foto), y el hardware se configura solo en Avanzado.
 
 ### Corte B — editor (pendiente; no marcar [x])
 
-- [ ] Editor canvas.
-- [ ] Import de fondo Canva.
+- [ ] Editor canvas (edición ligera; Canva completo no es requisito).
+- [ ] Import de fondo / asset (p. ej. Canva u otro) — no zip LumaBooth.
 - [ ] Capas: `photoSlot` / `image` / `text` / `QR` / `shape`.
 - [ ] Drag de slots.
 - Rotación: **fuera del MVP** (ni siquiera en Corte B obligatorio).
 
 **Depende de:** Corte A.
-**Listo cuando:** se puede componer una plantilla en app sin tocar JSON a mano. Hasta entonces, solo seed + JSON local.
+**Listo cuando:** se puede componer una plantilla en app sin tocar JSON a mano. Hasta entonces, solo seed T2 (ticket QR + ticket foto) + JSON local.
 
 ---
 

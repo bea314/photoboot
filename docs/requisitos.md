@@ -23,7 +23,7 @@ El booth debe poder **imprimir aunque falle el WiFi del salón**. El link públi
 - Galería masonry + vista detalle.
 - Borrar foto.
 - Selección múltiple e impresión (1 o N) desde Galería/Detalle, con plantilla activa del papel.
-- Preview real de impresión (térmica 80 mm y foto 10×15; seed 1 slot center-crop).
+- Preview real de impresión (térmica 80 mm con seeds ticket QR / ticket foto; foto 10×15 más adelante).
 - Gestión = biblioteca de plantillas; Avanzado = conexión, transporte y test print.
 - Dos perfiles de impresora: **térmica ESC/POS** (pruebas principales) y **Epson L8050**.
 - Link público de solo lectura `/e/:slug`.
@@ -107,12 +107,15 @@ El VPS **no imprime**. Solo registra jobs. El dispositivo del operador es el que
 
 **Plantillas (Corte A — alcance de producto):**
 
-- Biblioteca local de plantillas genéricas en JSON (sin editor canvas todavía).
-- Seed mínimo: térmica **80 mm** + foto **10×15**, cada una con **1 slot** center-crop.
-- `isActive` **por familia** (una activa para térmica, otra para foto), no un único global.
-- Al imprimir, Galería/Detalle consume esa plantilla activa del papel elegido.
+- Biblioteca local de plantillas genéricas en JSON (sin editor canvas ni Canva completo; Corte A/B ligero no lo exige).
+- **Seeds térmicos 80 mm (T2) — dos arquetipos:**
+  1. **Ticket QR:** logo + CTA + QR del evento + URL. **Sin `photoSlot`.** Sirve para compartir el link sin imprimir foto.
+  2. **Ticket foto:** `photoSlot` (fit **cover**) + texto (evento/marca) + timestamp con placeholders `{{fecha}}` / `{{hora}}` + icono/logo abajo.
+- Foto **10×15:** variante a color tipo arquetipo 2 (photoSlot + texto/marca) **más adelante** — no forma parte del seed mínimo hecho de Corte A.
+- `isActive` **por familia** (una activa para térmica, otra para foto cuando exista), no un único global.
+- Al imprimir desde Galería/Detalle (ticket foto / 10×15), se usa la plantilla activa con `photoSlot`. El ticket QR se puede disparar desde el flujo de evento/compartir sin foto.
 
-**Fuera de este corte (Corte B — pendiente):** editor canvas, import de fondo Canva, capas (`photoSlot` / `image` / `text` / `QR` / `shape`), drag de slots; rotación fuera del MVP. Los docs no asumen que el editor exista hasta que haya PR de implementación.
+**Fuera de este corte (Corte B — pendiente):** editor canvas, import de fondo (p. ej. Canva u otro asset), capas (`photoSlot` / `image` / `text` / `QR` / `shape`), drag de slots; rotación fuera del MVP. Edición ligera sí; Canva completo no es requisito de Corte A. Los docs no asumen que el editor exista hasta que haya PR de implementación. **No** adoptamos zip LumaBooth.
 
 ### 5.6 Gestión (plantillas) y Avanzado (impresora)
 
@@ -283,14 +286,14 @@ Conflicto: si el servidor marcó `deletedAt` y el local no, el local se oculta.
 ### 8.7 Flujo: imprimir
 
 1. Operador elige 1 (Detalle) o N (Galería) fotos. El layout es la **plantilla activa** de la familia del papel (térmica / 10×15).
-2. Flutter abre preview: aplica el slot/recorte de esa plantilla (seed: 1 slot center-crop).
+2. Flutter abre preview: aplica el layout de esa plantilla (ticket foto: `photoSlot` cover; ticket QR no usa foto).
 3. Confirma copias (y ve qué plantilla está Activa).
-4. Por cada foto:
-   1. Raster local (bitmap ESC/POS **o** JPEG 10×15 @ ~300 ppp).
+4. Por cada foto (si la plantilla tiene `photoSlot`):
+   1. Raster local (bitmap ESC/POS **o** JPEG 10×15 @ ~300 ppp cuando exista esa familia).
    2. Envío al transporte configurado en **Avanzado** (Bluetooth / TCP / USB / cola Epson).
    3. Resultado `printed` o `failed`.
 5. `POST /print-jobs` con el resultado (o se encola si no hay red).
-6. La foto se marca “impresa” en la galería.
+6. La foto se marca “impresa” en la galería (jobs de ticket QR sin foto no marcan `printedAt` de una Photo).
 
 Si no hay conexión: **“No hay conexión… Revísala en Avanzado”**. El preview y el raster **siempre** se calculan en Flutter. La API no genera el layout de impresión en el MVP.
 
