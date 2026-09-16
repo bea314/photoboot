@@ -132,37 +132,39 @@ Leyenda de estado para ir tachando:
 
 ## Fase D — Impresión (primero térmica)
 
+> Recorte UX (ver [`requisitos.md`](./requisitos.md) §5.5–5.6): **Imprimir 1/N vive en Galería/Detalle**. **Gestión** = biblioteca de plantillas (hub). **Avanzado** = conexión / transporte / test print. El pipeline de Fase D (perfiles, raster, PrintJob) ya está en main; el hub de plantillas es **Corte A** (abajo, PRs aparte). No marcar el editor (Corte B) como hecho.
+
 ### D1. Perfiles y preview
 
 - [x] Perfiles en app (y defaults en API si se quiere): `thermal_80`, `epson_l8050_4x6`.
 - [x] Preview: marco 80 mm vs marco 10×15, center-crop visible.
-- [x] Pantalla Gestión → Impresora: perfil activo, último dispositivo, estado.
+- [x] Pantalla de impresora (hoy en Gestión; destino de producto: **Avanzado**): perfil activo, último dispositivo, estado.
 
 **Depende de:** A2, C4.
 **Listo cuando:** la misma foto se ve recortada distinto en cada perfil, sin imprimir aún.
 
 ### D2. Raster + ESC/POS (térmica de prueba)
 
-- [~] Descubrir/emparejar térmica (Bluetooth y/o TCP `IP:9100`).
+- [~] Descubrir/emparejar térmica (Bluetooth y/o TCP `IP:9100`) — superficie de producto: **Avanzado**.
 - [x] Raster: escala al ancho, dither, bitmap ESC/POS.
-- [x] Imprimir 1 foto desde detalle.
+- [x] Imprimir 1 foto desde detalle (usa plantilla/perfil activo del papel; no un panel en Gestión).
 - [~] Imprimir N desde masonry.
-- [x] Errores legibles: desconectada, timeout, papel.
+- [x] Errores legibles: desconectada, timeout, papel (microcopy hacia Avanzado: “No hay conexión… Revísala en Avanzado”).
 
 **Depende de:** D1.
 **Listo cuando:** la térmica de prueba saca una foto reconocible y un lote de 3.
 
-> D2 notes: TCP `IP:9100` + stub simulator are wired. Bluetooth SPP is an interface stub (readable “unsupported” until hardware plugin). Detalle wires `PrintService.printOne` (1 foto). Multi-select “Imprimir N” from masonry still needs C4 selection UI — `PrintService.printPhotos` is ready. Gestión keeps demo + test paths.
+> D2 notes: TCP `IP:9100` + stub simulator are wired. Bluetooth SPP is an interface stub (readable “unsupported” until hardware plugin). Detalle wires `PrintService.printOne` (1 foto). Multi-select “Imprimir N” from masonry still needs C4 selection UI — `PrintService.printPhotos` is ready. Demo + test paths viven en la pantalla de impresora (mover/renombrar a **Avanzado** con Corte A).
 
 ### D3. Test print térmica
 
 - [x] Ticket de prueba: marca Fotoboot, perfil, fecha, bloque de contraste, sample.
-- [x] Si el test falla, advertencia en rojo en galería.
+- [x] Si el test falla, advertencia en rojo en galería **con enlace a Avanzado** (no al hub de plantillas).
 
 **Depende de:** D2.
 **Listo cuando:** “Imprimir prueba” es el primer check al montar el booth.
 
-> D3 notes: Red warning lives on Gestión and via `PrinterSettingsStore.galleryPrintWarning()` for C4 gallery to consume. Hardware paper feed needs a real thermal to verify visually.
+> D3 notes: Red warning via `PrinterSettingsStore.galleryPrintWarning()` for C4 gallery to consume; destino UX = link a **Avanzado**. Hardware paper feed needs a real thermal to verify visually.
 
 ### D4. PrintJob en API
 
@@ -188,6 +190,35 @@ Leyenda de estado para ir tachando:
 **Listo cuando:** una foto sale en 10×15 en la L8050 y el test print también.
 
 > D5 notes: `EpsonPrintScaffold` builds the 10×15 @ 300 dpi JPEG (center-crop). Send path / SDK / OS dialog are TODO with clear `PrinterException.unsupported`.
+
+---
+
+## Plantillas — Corte A / Corte B
+
+Producto descrito en [`requisitos.md`](./requisitos.md) §5.5–5.6. La implementación de código (T1/T2/T3) puede ir en **PRs separados**; este plan fija el alcance. **No fingir que el editor existe.**
+
+### Corte A — biblioteca + print con plantilla activa (alcance actual)
+
+- [ ] **Gestión** = hub de plantillas (tab **Plantillas**), no panel de transportes.
+- [ ] **Avanzado** = conexión / transporte / test print (lo que hoy es la pantalla de impresora de Fase D).
+- [ ] Plantillas genéricas JSON **local**; seed térmica **80** + foto **10×15**, cada una con **1 slot** center-crop.
+- [ ] `isActive` **por familia** (térmica vs foto).
+- [ ] Microcopy: **“Usar en este evento”**, badge **Activa**, **“Elige una plantilla para imprimir”**.
+- [ ] Galería/Detalle: Imprimir 1/N con la plantilla activa del papel; warning test-fail → link a Avanzado.
+
+**Depende de:** D1–D3 (pipeline de print), C4.
+**Listo cuando:** el operador elige plantilla en Gestión, imprime desde Galería/Detalle con esa activa, y el hardware se configura solo en Avanzado.
+
+### Corte B — editor (pendiente; no marcar [x])
+
+- [ ] Editor canvas.
+- [ ] Import de fondo Canva.
+- [ ] Capas: `photoSlot` / `image` / `text` / `QR` / `shape`.
+- [ ] Drag de slots.
+- Rotación: **fuera del MVP** (ni siquiera en Corte B obligatorio).
+
+**Depende de:** Corte A.
+**Listo cuando:** se puede componer una plantilla en app sin tocar JSON a mano. Hasta entonces, solo seed + JSON local.
 
 ---
 
@@ -228,7 +259,7 @@ Leyenda de estado para ir tachando:
 
 ### F1. Pulido UI operador
 
-- [ ] Estados vacíos (sin evento, sin fotos, impresora off).
+- [ ] Estados vacíos (sin evento, sin fotos, sin plantilla activa, impresora off → Avanzado).
 - [ ] Contraste y tamaños de tap.
 - [ ] QR a pantalla completa usable desde 2–3 m.
 
@@ -255,15 +286,17 @@ Leyenda de estado para ir tachando:
 A1 → A2 + A3
      → B1 → B2 → B3
      → C1 → C2 → C3 → C4
-     → D1 → D2 → D3 → D4     ← térmica aquí
+     → D1 → D2 → D3 → D4     ← térmica / pipeline print (main)
+     → Corte A (plantillas hub + Avanzado)  ← PRs de templates aparte
      → E1 → E2
      → F1 → F2
      → D5                     ← L8050 cuando el print ya esté sólido
      → E3                     ← VPS cuando local ya funcione
+     → Corte B (editor)       ← después; no bloquear el primer ensayo
 ```
 
 ## Criterio para no desviarse
 
-Si una actividad no ayuda a: **tomar, ver, imprimir en térmica o compartir el link**, va después del MVP.
+Si una actividad no ayuda a: **tomar, ver, imprimir en térmica o compartir el link**, va después del MVP. El editor de plantillas (Corte B) no bloquea el primer ensayo si Corte A (seed + activa) cubre el print.
 
 Detalle de contratos y flujos: [`requisitos.md`](./requisitos.md).
