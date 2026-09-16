@@ -14,8 +14,10 @@ import 'package:fotoboot_operator/printing/transport/tcp_transport.dart';
 import 'package:fotoboot_operator/printing/widgets/print_preview.dart';
 import 'package:fotoboot_operator/services/auth_controller.dart';
 import 'package:fotoboot_operator/theme/app_colors.dart';
+import 'package:go_router/go_router.dart';
 
-/// Gestión → Impresora: profile, device, status, preview, test print.
+/// Avanzado → Impresora: profile, transport, status, preview, test print.
+/// Event photo printing lives in Galería / Detalle — not here.
 class PrinterScreen extends StatefulWidget {
   const PrinterScreen({super.key, required this.auth});
 
@@ -260,7 +262,7 @@ class _PrinterScreenState extends State<PrinterScreen> {
       _busy = false;
       _message = result.ok
           ? 'Demo impresa (${result.bytesSent} bytes). '
-              'Galería usará PrintService.printPhotos cuando C4 esté listo.'
+              'Las fotos del evento se imprimen desde Galería o Detalle.'
           : result.error;
     });
   }
@@ -270,7 +272,20 @@ class _PrinterScreenState extends State<PrinterScreen> {
     final warning = _lastTestOk == false;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Gestión · Impresora')),
+      appBar: AppBar(
+        title: const Text('Avanzado · Impresora'),
+        leading: IconButton(
+          tooltip: 'Volver a plantillas',
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/templates');
+            }
+          },
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
@@ -498,8 +513,8 @@ class _PrinterScreenState extends State<PrinterScreen> {
           ],
           const SizedBox(height: 32),
           const Text(
-            'Desde galería / detalle (Fase C): usa PrintService.printOne / '
-            'printPhotos y PrinterSettingsStore.galleryPrintWarning().',
+            'Las fotos del evento se imprimen desde Galería o Detalle. '
+            'Aquí solo conexión, transporte y prueba de impresora.',
             style: TextStyle(color: AppColors.grey, fontSize: 13),
           ),
         ],

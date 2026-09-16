@@ -5,6 +5,7 @@ import 'package:fotoboot_operator/screens/gallery_screen.dart';
 import 'package:fotoboot_operator/screens/login_screen.dart';
 import 'package:fotoboot_operator/screens/photo_detail_screen.dart';
 import 'package:fotoboot_operator/screens/printer_screen.dart';
+import 'package:fotoboot_operator/screens/templates_screen.dart';
 import 'package:fotoboot_operator/services/auth_controller.dart';
 import 'package:fotoboot_operator/services/photo_controller.dart';
 import 'package:go_router/go_router.dart';
@@ -18,6 +19,8 @@ GoRouter createAppRouter(AuthController auth, PhotoController photos) {
       final loggingIn = state.matchedLocation == '/login';
       if (!auth.authenticated && !loggingIn) return '/login';
       if (auth.authenticated && loggingIn) return '/camera';
+      // Legacy Gestión path → templates hub.
+      if (state.matchedLocation == '/printer') return '/templates';
       return null;
     },
     routes: [
@@ -63,9 +66,16 @@ GoRouter createAppRouter(AuthController auth, PhotoController photos) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/printer',
-                name: 'printer',
-                builder: (context, state) => PrinterScreen(auth: auth),
+                path: '/templates',
+                name: 'templates',
+                builder: (context, state) => const TemplatesScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'printer',
+                    name: 'templates-printer',
+                    builder: (context, state) => PrinterScreen(auth: auth),
+                  ),
+                ],
               ),
             ],
           ),
@@ -98,13 +108,14 @@ class OperatorShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final onPhotoDetail =
-        GoRouterState.of(context).uri.path.contains('/gallery/detail/');
+    final path = GoRouterState.of(context).uri.path;
+    final onPhotoDetail = path.contains('/gallery/detail/');
+    final onAdvancedPrinter = path == '/templates/printer';
 
     return Scaffold(
       extendBody: navigationShell.currentIndex == 0 && !onPhotoDetail,
       body: navigationShell,
-      bottomNavigationBar: onPhotoDetail
+      bottomNavigationBar: (onPhotoDetail || onAdvancedPrinter)
           ? null
           : NavigationBar(
               selectedIndex: navigationShell.currentIndex,
@@ -121,8 +132,8 @@ class OperatorShell extends StatelessWidget {
                   label: 'Galería',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.print_outlined),
-                  selectedIcon: Icon(Icons.print),
+                  icon: Icon(Icons.dashboard_customize_outlined),
+                  selectedIcon: Icon(Icons.dashboard_customize),
                   label: 'Gestión',
                 ),
                 NavigationDestination(

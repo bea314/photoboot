@@ -94,7 +94,8 @@ class PrinterSettingsStore {
     final ok = await readLastTestOk();
     if (ok == false) {
       final err = await readLastTestError();
-      return err ?? 'La prueba de impresora falló. Revisa Gestión → Impresora.';
+      return err ??
+          'La prueba de impresora falló. Revísala en Avanzado.';
     }
     return null;
   }
