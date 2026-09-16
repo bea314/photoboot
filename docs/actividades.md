@@ -148,13 +148,13 @@ Leyenda de estado para ir tachando:
 - [~] Descubrir/emparejar térmica (Bluetooth y/o TCP `IP:9100`) — superficie de producto: **Avanzado**.
 - [x] Raster: escala al ancho, dither, bitmap ESC/POS.
 - [x] Imprimir 1 foto desde detalle (usa plantilla/perfil activo del papel; no un panel en Gestión).
-- [~] Imprimir N desde masonry.
+- [x] Imprimir N desde masonry (plantilla activa; paginar ceil(N/S); Ticket QR 0 slots no consume fotos).
 - [x] Errores legibles: desconectada, timeout, papel (microcopy hacia Avanzado: “No hay conexión… Revísala en Avanzado”).
 
 **Depende de:** D1.
 **Listo cuando:** la térmica de prueba saca una foto reconocible y un lote de 3.
 
-> D2 notes: TCP `IP:9100` + stub simulator are wired. Bluetooth SPP is an interface stub (readable “unsupported” until hardware plugin). Detalle wires `PrintService.printOne` (1 foto). Multi-select “Imprimir N” from masonry still needs C4 selection UI — `PrintService.printPhotos` is ready. Demo + test paths viven en la pantalla de impresora (mover/renombrar a **Avanzado** con Corte A).
+> D2 notes: TCP `IP:9100` + stub simulator are wired. Bluetooth SPP is an interface stub (readable “unsupported” until hardware plugin). Detalle + Galería “Imprimir N” usan la plantilla activa (`TemplatePrintFlow` + composer compartido preview/print). Demo + test paths viven en **Avanzado** (`/templates/printer`).
 
 ### D3. Test print térmica
 
@@ -164,7 +164,7 @@ Leyenda de estado para ir tachando:
 **Depende de:** D2.
 **Listo cuando:** “Imprimir prueba” es el primer check al montar el booth.
 
-> D3 notes: Red warning via `PrinterSettingsStore.galleryPrintWarning()` for C4 gallery to consume; destino UX = link a **Avanzado**. Hardware paper feed needs a real thermal to verify visually.
+> D3 notes: Red warning + link a **Avanzado** (`/templates/printer`) en el flujo de impresión de Galería/Detalle. Hardware paper feed needs a real thermal to verify visually.
 
 ### D4. PrintJob en API
 
@@ -208,7 +208,7 @@ Producto descrito en [`requisitos.md`](./requisitos.md) §5.5–5.6. La implemen
 - [ ] Foto **10×15** variante a color tipo arquetipo 2: **más adelante** (no marcar hecha aquí).
 - [x] `isActive` **por familia** (térmica vs foto).
 - [x] Microcopy: **“Usar en este evento”**, badge **Activa**, **“Elige una plantilla para imprimir”**.
-- [ ] Galería/Detalle: Imprimir 1/N con la plantilla activa del papel (ticket foto); warning test-fail → link a Avanzado.
+- [x] Galería/Detalle: Imprimir 1/N con la plantilla activa del papel (ticket foto); warning test-fail → link a Avanzado.
 
 **Depende de:** D1–D3 (pipeline de print), C4.
 **Listo cuando:** el operador elige entre ticket QR y ticket foto en Gestión, imprime desde Galería/Detalle con la activa (foto), y el hardware se configura solo en Avanzado.
@@ -263,7 +263,7 @@ Producto descrito en [`requisitos.md`](./requisitos.md) §5.5–5.6. La implemen
 
 ### F1. Pulido UI operador
 
-- [ ] Estados vacíos (sin evento, sin fotos, sin plantilla activa, impresora off → Avanzado).
+- [x] Estados vacíos (sin evento, sin fotos, sin plantilla activa → sheet Gestión; impresora off / test-fail → Avanzado).
 - [ ] Contraste y tamaños de tap.
 - [ ] QR a pantalla completa usable desde 2–3 m.
 

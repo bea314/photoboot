@@ -1,13 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fotoboot_operator/models/local_photo.dart';
-import 'package:fotoboot_operator/printing/print_job_reporter.dart';
-import 'package:fotoboot_operator/printing/print_service.dart';
-import 'package:fotoboot_operator/printing/printer_profiles.dart';
-import 'package:fotoboot_operator/printing/printer_settings.dart';
-import 'package:fotoboot_operator/printing/transport/bluetooth_transport.dart';
-import 'package:fotoboot_operator/printing/transport/printer_transport.dart';
-import 'package:fotoboot_operator/printing/transport/stub_transport.dart';
-import 'package:fotoboot_operator/printing/transport/tcp_transport.dart';
+import 'package:fotoboot_operator/printing/template_print_flow.dart';
 import 'package:fotoboot_operator/services/auth_controller.dart';
 import 'package:fotoboot_operator/services/photo_controller.dart';
 import 'package:fotoboot_operator/services/photo_download.dart';
@@ -73,8 +66,7 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
   bool _downloading = false;
   bool _printing = false;
 
-  final _settings = PrinterSettingsStore();
-  final _printService = PrintService();
+  final _printFlow = TemplatePrintFlow();
 
   String _format(DateTime value) {
     final local = value.toLocal();
@@ -127,102 +119,15 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
     }
   }
 
-  PrinterTransport _transportFor(String id) {
-    switch (id) {
-      case 'tcp':
-        return TcpPrinterTransport();
-      case 'bluetooth':
-        return BluetoothPrinterTransport();
-      default:
-        return StubPrinterTransport();
-    }
-  }
-
   Future<void> _printOne(LocalPhoto photo) async {
     if (_printing) return;
-
-    final warning = await _settings.galleryPrintWarning();
-    if (warning != null && mounted) {
-      final proceed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Impresora'),
-          content: Text(warning),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Imprimir igual'),
-            ),
-          ],
-        ),
-      );
-      if (proceed != true) return;
-    }
-
     setState(() => _printing = true);
     try {
-      final bytes = await widget.photos.files.readOriginal(photo.clientPhotoId) ??
-          await widget.photos.files.readBest(photo.clientPhotoId);
-      if (bytes == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No hay archivo local para imprimir')),
-          );
-        }
-        return;
-      }
-
-      final profileId = await _settings.readActiveProfileId();
-      final profile = PrinterProfile.byId(profileId);
-      final endpoint =
-          await _settings.readLastEndpoint() ?? PrinterEndpoint.stub;
-      final transport = _transportFor(endpoint.transportId);
-      final reporter = PrintJobReporter(api: widget.auth.api);
-
-      final result = await _printService.printOne(
-        photo: PhotoPrintRequest(
-          imageBytes: bytes,
-          photoId: photo.serverId,
-          clientPhotoId: photo.clientPhotoId,
-        ),
-        profile: profile,
-        transport: transport,
-        endpoint: endpoint,
-      );
-      await transport.disconnect();
-
-      if (photo.serverId != null) {
-        await reporter.report(
-          PrintJobReport(
-            eventId: photo.eventId,
-            printerProfile: profile.id.apiId,
-            copies: 1,
-            localStatus: result.ok ? 'printed' : 'failed',
-            type: 'photo',
-            photoIds: [photo.serverId!],
-            error: result.error,
-          ),
-        );
-      }
-
-      if (result.ok) {
-        await widget.photos.markPrintedLocally(photo.clientPhotoId);
-      }
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            result.ok
-                ? 'Impresa (${result.bytesSent} bytes)'
-                : (result.error ?? 'Error al imprimir'),
-          ),
-          backgroundColor: result.ok ? null : AppColors.redDark,
-        ),
+      await _printFlow.printPhotoBatch(
+        context: context,
+        photos: widget.photos,
+        api: widget.auth.api,
+        batch: [photo],
       );
     } catch (e) {
       if (mounted) {

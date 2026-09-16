@@ -44,3 +44,21 @@ CropRect centerCropNormalized({
   final h = sourceAspect / targetAspect;
   return CropRect(0, (1 - h) / 2, 1, h);
 }
+
+/// Cover-crop a photo into a template [photoSlot] (normalized paper coords).
+///
+/// Same algorithm as full-frame [centerCropRect], but the target aspect is the
+/// slot's `w/h` rather than the whole paper profile.
+CropRect coverCropForSlot({
+  required double sourceWidth,
+  required double sourceHeight,
+  required double slotW,
+  required double slotH,
+}) {
+  assert(slotW > 0 && slotH > 0);
+  return centerCropRect(
+    sourceWidth: sourceWidth,
+    sourceHeight: sourceHeight,
+    aspectRatio: slotW / slotH,
+  );
+}

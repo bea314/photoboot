@@ -47,8 +47,8 @@ class BatchPrintResult {
 
 /// App-layer print API: 1 photo or N photos for the active profile.
 ///
-/// Gallery multi-select (C4) can call [printPhotos] once it exists; Gestión
-/// and Detalle placeholders can call [printOne] with local JPEG bytes.
+/// Galería/Detalle compose pages via [TemplatePrintFlow] then call
+/// [printPhotos] / [printOne] with the rendered template PNGs.
 class PrintService {
   PrintService({
     ThermalEscPosRasterizer? rasterizer,
