@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:fotoboot_operator/models/local_photo.dart';
+import 'package:fotoboot_operator/printing/template_print_flow.dart';
 import 'package:fotoboot_operator/services/photo_controller.dart';
 import 'package:fotoboot_operator/services/photo_file_store.dart';
 import 'package:fotoboot_operator/theme/app_colors.dart';
@@ -19,6 +20,9 @@ class GalleryScreen extends StatefulWidget {
 
 class _GalleryScreenState extends State<GalleryScreen> {
   final _selected = <String>{};
+  bool _printing = false;
+  final _printFlow = TemplatePrintFlow();
+
   bool get _selecting => _selected.isNotEmpty;
 
   void _toggle(String id) {
@@ -38,7 +42,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
       builder: (context) {
         return AlertDialog(
           title: Text(count == 1 ? 'Eliminar foto' : 'Eliminar $count fotos'),
-          content: const Text('Se quitan de la galería y, si ya estaban subidas, del servidor.'),
+          content: const Text(
+            'Se quitan de la galería y, si ya estaban subidas, del servidor.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -57,32 +63,81 @@ class _GalleryScreenState extends State<GalleryScreen> {
     if (mounted) setState(_selected.clear);
   }
 
+  Future<void> _printSelected() async {
+    if (_printing || _selected.isEmpty) return;
+    final batch = widget.photos.photos
+        .where((p) => _selected.contains(p.clientPhotoId))
+        .toList();
+    if (batch.isEmpty) return;
+
+    setState(() => _printing = true);
+    try {
+      final ok = await _printFlow.printPhotoBatch(
+        context: context,
+        photos: widget.photos,
+        api: widget.photos.api,
+        batch: batch,
+      );
+      if (ok && mounted) {
+        setState(_selected.clear);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al imprimir: $e'),
+            backgroundColor: AppColors.redDark,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: widget.photos,
       builder: (context, _) {
         final photos = widget.photos.photos;
+        final n = _selected.length;
         return Scaffold(
           appBar: AppBar(
-            title: Text(_selecting ? '${_selected.length} seleccionadas' : 'Galería'),
+            title: Text(_selecting ? '$n seleccionadas' : 'Galería'),
             leading: _selecting
                 ? IconButton(
                     icon: const Icon(Icons.close),
-                    onPressed: () => setState(_selected.clear),
+                    onPressed: _printing
+                        ? null
+                        : () => setState(_selected.clear),
                   )
                 : null,
             actions: [
-              if (_selecting)
+              if (_selecting) ...[
+                IconButton(
+                  tooltip: _printing ? 'Imprimiendo…' : 'Imprimir $n',
+                  onPressed: _printing ? null : _printSelected,
+                  icon: _printing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.print_outlined),
+                ),
                 IconButton(
                   tooltip: 'Eliminar',
-                  onPressed: () => _confirmDelete(_selected.toList()),
+                  onPressed: _printing
+                      ? null
+                      : () => _confirmDelete(_selected.toList()),
                   icon: const Icon(Icons.delete_outline),
-                )
-              else
+                ),
+              ] else
                 IconButton(
                   tooltip: 'Sincronizar',
-                  onPressed: widget.photos.syncing ? null : widget.photos.syncNow,
+                  onPressed:
+                      widget.photos.syncing ? null : widget.photos.syncNow,
                   icon: widget.photos.syncing
                       ? const SizedBox(
                           width: 18,
@@ -93,6 +148,13 @@ class _GalleryScreenState extends State<GalleryScreen> {
                 ),
             ],
           ),
+          floatingActionButton: _selecting
+              ? FloatingActionButton.extended(
+                  onPressed: _printing ? null : _printSelected,
+                  icon: const Icon(Icons.print),
+                  label: Text(_printing ? 'Imprimiendo…' : 'Imprimir $n'),
+                )
+              : null,
           body: photos.isEmpty
               ? Center(
                   child: Padding(
@@ -101,7 +163,10 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       widget.photos.error ??
                           'Aún no hay fotos.\nVe a Cámara y dispara.',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppColors.grey, fontSize: 18),
+                      style: const TextStyle(
+                        color: AppColors.grey,
+                        fontSize: 18,
+                      ),
                     ),
                   ),
                 )
@@ -110,7 +175,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
                   onRefresh: widget.photos.syncNow,
                   child: MasonryGridView.count(
                     padding: const EdgeInsets.all(12),
-                    crossAxisCount: MediaQuery.sizeOf(context).width > 700 ? 3 : 2,
+                    crossAxisCount:
+                        MediaQuery.sizeOf(context).width > 700 ? 3 : 2,
                     mainAxisSpacing: 8,
                     crossAxisSpacing: 8,
                     itemCount: photos.length,
