@@ -22,9 +22,9 @@ El booth debe poder **imprimir aunque falle el WiFi del salón**. El link públi
 - Cámara con countdown 3-2-1.
 - Galería masonry + vista detalle.
 - Borrar foto.
-- Selección múltiple e impresión (1 o N).
-- Preview real de impresión (térmica 80 mm y foto 10×15).
-- Gestión de impresora: estado, test print, perfil activo.
+- Selección múltiple e impresión (1 o N) desde Galería/Detalle, con plantilla activa del papel.
+- Preview real de impresión (térmica 80 mm con seeds ticket QR / ticket foto; foto 10×15 más adelante).
+- Gestión = biblioteca de plantillas; Avanzado = conexión, transporte y test print.
 - Dos perfiles de impresora: **térmica ESC/POS** (pruebas principales) y **Epson L8050**.
 - Link público de solo lectura `/e/:slug`.
 - Subida de fotos al VPS (original + thumbnail).
@@ -95,22 +95,51 @@ El VPS **no imprime**. Solo registra jobs. El dispositivo del operador es el que
 
 ### 5.5 Impresión
 
-- Mismo job para 1 foto o N: `print(photoIds[], printerProfile)`.
-- Antes de imprimir, preview del recorte real (no el JPG crudo).
-- Confirmación: perfil, copias, papel.
+- Imprimir **1** (Detalle) o **N** (Galería, selección múltiple). No hay panel de impresión en Gestión.
+- El job usa la **plantilla activa** de la familia del papel actual (`thermal` / foto `10×15`), no un layout inventado al vuelo.
+- Mismo contrato: `print(photoIds[], printerProfile)` + plantilla activa del dispositivo.
+- Antes de imprimir, preview del recorte real según la plantilla (slot center-crop; no el JPG crudo).
+- Confirmación: papel/perfil, copias, plantilla activa.
 - Historial local + registro en API cuando haya red (`PrintJob`).
 - Reintento si falla el envío a la impresora.
+- Si no hay conexión de impresora: aviso tipo **“No hay conexión… Revísala en Avanzado”** (enlace a Avanzado).
+- Si el último test print falló: warning en Galería/Detalle con enlace a **Avanzado** (no a un hub de transportes en Gestión).
 
-### 5.6 Gestión de impresora
+**Plantillas (Corte A — alcance de producto):**
 
-Pantalla **Gestión → Impresora**:
+- Biblioteca local de plantillas genéricas en JSON (sin editor canvas ni Canva completo; Corte A/B ligero no lo exige).
+- **Seeds térmicos 80 mm (T2) — dos arquetipos:**
+  1. **Ticket QR:** logo + CTA + QR del evento + URL. **Sin `photoSlot`.** Sirve para compartir el link sin imprimir foto.
+  2. **Ticket foto:** `photoSlot` (fit **cover**) + texto (evento/marca) + timestamp con placeholders `{{fecha}}` / `{{hora}}` + icono/logo abajo.
+- Foto **10×15:** variante a color tipo arquetipo 2 (photoSlot + texto/marca) **más adelante** — no forma parte del seed mínimo hecho de Corte A.
+- `isActive` **por familia** (una activa para térmica, otra para foto cuando exista), no un único global.
+- Al imprimir desde Galería/Detalle (ticket foto / 10×15), se usa la plantilla activa con `photoSlot`. El ticket QR se puede disparar desde el flujo de evento/compartir sin foto.
 
-- Perfil activo: `thermal` o `epson_l8050`.
+**Fuera de este corte (Corte B — pendiente):** editor canvas, import de fondo (p. ej. Canva u otro asset), capas (`photoSlot` / `image` / `text` / `QR` / `shape`), drag de slots; rotación fuera del MVP. Edición ligera sí; Canva completo no es requisito de Corte A. Los docs no asumen que el editor exista hasta que haya PR de implementación. **No** adoptamos zip LumaBooth.
+
+### 5.6 Gestión (plantillas) y Avanzado (impresora)
+
+La UX de “Gestión de impresora” se parte en dos superficies. **Gestión no es el panel de transportes.**
+
+Modelo mental de sector (referencia, no formato a copiar): en flujos tipo booth las plantillas viven en el **setup del evento** (elegir layout, ajuste ligero, cambiar papel/layout sin rediseñar, probar con la cámara), no en una pantalla de debug de impresora. Ver [Import & Edit LumaBooth Templates](https://photoboothlayouts.com/how-to-import-edit-lumabooth-templates-on-mac/) como inspiración de ese flujo. **No** adoptamos el formato zip LumaBooth/DSLRBooth; nuestras plantillas son JSON local genérico (Corte A) y edición propia más adelante (Corte B).
+
+#### Gestión — hub de plantillas (tab **Plantillas**)
+
+- Biblioteca de plantillas del dispositivo (seed + las que se añadan después).
+- Lista/grid con preview; badge **Activa** en la plantilla en uso por familia.
+- Acción **“Usar en este evento”** para marcar activa la plantilla elegida (por familia térmica vs foto).
+- Empty / guía: **“Elige una plantilla para imprimir”** cuando aún no hay activa o hay que cambiar.
+- Desde aquí se elige *qué* se imprime encima del papel; no se empareja hardware.
+- Cambiar papel/familia o plantilla activa **sin** rediseñar layout a mano (Corte A: elegir otra del seed/biblioteca).
+
+#### Avanzado — conexión, transporte y test print
+
+- Perfil de papel/impresora: `thermal` / `epson_l8050` (y anchos 58/80 mm, márgenes, borderless Epson).
 - Descubrimiento / pairing (Bluetooth, IP, USB según plataforma).
 - Estado: desconectada / conectada / sin papel / error / desconocido.
-- Tamaño, márgenes, borderless (Epson), ancho 58/80 mm (térmica).
 - **Test print** obligatorio: página o ticket de prueba con marca (rojo/blanco), fecha y “Fotoboot OK”.
-- Guardar la última impresora usada en el dispositivo.
+- Guardar la última impresora / transporte usado en el dispositivo.
+- Fallo de test → warning consumible desde Galería (link de vuelta a Avanzado).
 
 ### 5.7 Invitados (web)
 
@@ -256,24 +285,24 @@ Conflicto: si el servidor marcó `deletedAt` y el local no, el local se oculta.
 
 ### 8.7 Flujo: imprimir
 
-1. Operador elige 1 o N fotos y perfil (térmica o L8050).
-2. Flutter abre preview: aplica el recorte del perfil (80 mm o 10×15).
-3. Confirma copias.
-4. Por cada foto:
-   1. Raster local (bitmap ESC/POS **o** JPEG 10×15 @ ~300 ppp).
-   2. Envío al transporte de la impresora (Bluetooth / TCP / USB / cola Epson).
+1. Operador elige 1 (Detalle) o N (Galería) fotos. El layout es la **plantilla activa** de la familia del papel (térmica / 10×15).
+2. Flutter abre preview: aplica el layout de esa plantilla (ticket foto: `photoSlot` cover; ticket QR no usa foto).
+3. Confirma copias (y ve qué plantilla está Activa).
+4. Por cada foto (si la plantilla tiene `photoSlot`):
+   1. Raster local (bitmap ESC/POS **o** JPEG 10×15 @ ~300 ppp cuando exista esa familia).
+   2. Envío al transporte configurado en **Avanzado** (Bluetooth / TCP / USB / cola Epson).
    3. Resultado `printed` o `failed`.
 5. `POST /print-jobs` con el resultado (o se encola si no hay red).
-6. La foto se marca “impresa” en la galería.
+6. La foto se marca “impresa” en la galería (jobs de ticket QR sin foto no marcan `printedAt` de una Photo).
 
-El preview y el raster **siempre** se calculan en Flutter. La API no genera el layout de impresión en el MVP.
+Si no hay conexión: **“No hay conexión… Revísala en Avanzado”**. El preview y el raster **siempre** se calculan en Flutter. La API no genera el layout de impresión en el MVP.
 
 ### 8.8 Flujo: test print
 
-1. Gestión → Impresora → “Imprimir prueba”.
+1. **Avanzado** → “Imprimir prueba” (no el hub de plantillas en Gestión).
 2. No usa una foto del evento. Usa un asset de test + texto de estado (perfil, IP/MAC, fecha).
 3. Mismo pipeline de raster/envío que una foto real.
-4. Si el test falla, no se habilita “Imprimir” en galería (o se advierte en rojo).
+4. Si el test falla, warning en Galería/Detalle con enlace a **Avanzado**.
 5. Opcional: `POST /print-jobs` con `type: test` para histórico.
 
 ### 8.9 Flujo: link del evento
@@ -343,8 +372,8 @@ Un solo VPS sirve API + web de invitados + archivos. Flutter se instala en el di
 
 - Fondo blanco, acento rojo, texto negro/rojo.
 - Cámara y “disparar” como acción dominante.
-- Gestión de impresora accesible desde un menú, no escondida.
-- Estados vacíos claros: sin evento, sin fotos, impresora desconectada.
+- Gestión (plantillas) y Avanzado (impresora) accesibles, no escondidos.
+- Estados vacíos claros: sin evento, sin fotos, sin plantilla activa (“Elige una plantilla para imprimir”), impresora desconectada.
 - El preview de impresión se ve **antes** de mandar papel.
 
 ## 12. Criterios de aceptación del MVP
