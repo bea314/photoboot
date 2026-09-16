@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:fotoboot_operator/models/print_template.dart';
 import 'package:fotoboot_operator/printing/printer_profiles.dart';
 import 'package:fotoboot_operator/printing/printer_settings.dart';
+import 'package:fotoboot_operator/screens/template_wizard.dart';
 import 'package:fotoboot_operator/services/template_store.dart';
 import 'package:fotoboot_operator/templates/template_preview.dart';
 import 'package:fotoboot_operator/theme/app_colors.dart';
 import 'package:go_router/go_router.dart';
 
-/// Gestión hub: plantillas de impresión con biblioteca Hive local (T2).
+/// Gestión hub: plantillas de impresión con biblioteca Hive local (T2 + Corte B).
 class TemplatesScreen extends StatefulWidget {
   const TemplatesScreen({super.key, this.store});
 
@@ -86,10 +87,11 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
 
   void _openAdvanced() => context.go('/templates/printer');
 
-  void _showComingSoon(String action) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$action — disponible en el siguiente corte')),
-    );
+  void _openEditor(PrintTemplate template) {
+    context.push('/templates/edit/${template.id}').then((_) {
+      if (!mounted) return;
+      setState(() => _templates = _store.listAll());
+    });
   }
 
   Future<void> _onUse(PrintTemplate template) async {
@@ -111,90 +113,10 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
     setState(() => _templates = _store.listAll());
   }
 
-  TemplatePaper _paperForProfile(PrinterProfile profile) {
-    switch (profile.id) {
-      case PrinterProfileId.thermal80:
-        return const TemplatePaper(
-          widthMm: 80,
-          heightMm: 100,
-          family: PaperFamily.thermal,
-        );
-      case PrinterProfileId.epsonL80504x6:
-        return const TemplatePaper(
-          widthMm: 100,
-          heightMm: 150,
-          family: PaperFamily.photo,
-        );
-    }
-  }
-
   Future<void> _showNewTemplateSheet() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Nueva plantilla',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Elige el papel. Se crea una plantilla genérica '
-                  '(ticket foto en térmica, 1 hueco en foto).',
-                  style: TextStyle(color: AppColors.grey, fontSize: 15),
-                ),
-                const SizedBox(height: 20),
-                ...PrinterProfile.defaults.map((p) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: SizedBox(
-                      height: 52,
-                      child: OutlinedButton(
-                        onPressed: () async {
-                          Navigator.pop(context);
-                          final created = await _store.createGeneric(
-                            paper: _paperForProfile(p),
-                            name: 'Plantilla ${p.frameLabel}',
-                          );
-                          if (!mounted) return;
-                          setState(() => _templates = _store.listAll());
-                          ScaffoldMessenger.of(this.context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                '“${created.name}” guardada en el dispositivo',
-                              ),
-                            ),
-                          );
-                        },
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            p.label,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    await showNewTemplateWizard(context, store: _store);
+    if (!mounted) return;
+    setState(() => _templates = _store.listAll());
   }
 
   @override
@@ -361,7 +283,7 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
                     crossAxisCount: crossAxisCount,
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
-                    childAspectRatio: crossAxisCount == 1 ? 1.35 : 0.92,
+                    childAspectRatio: crossAxisCount == 1 ? 1.2 : 0.82,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
@@ -369,9 +291,7 @@ class _TemplatesScreenState extends State<TemplatesScreen> {
                       return _TemplateCard(
                         template: t,
                         onUse: () => _onUse(t),
-                        onEdit: () => _showComingSoon(
-                          'Editar (editor en Corte B)',
-                        ),
+                        onEdit: () => _openEditor(t),
                         onDuplicate: () => _onDuplicate(t),
                       );
                     },
@@ -472,11 +392,11 @@ class _TemplateCard extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: SizedBox(
+                          child: SizedBox(
                           height: 48,
                           child: FilledButton(
                             onPressed: onUse,
-                            child: const Text('Usar'),
+                            child: const Text('Usar en este evento'),
                           ),
                         ),
                       ),

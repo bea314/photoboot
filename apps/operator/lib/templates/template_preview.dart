@@ -90,6 +90,21 @@ class TemplatePreviewPainter extends CustomPainter {
           canvas.drawLine(Offset(dx, rect.top), Offset(dx, rect.bottom), grid);
           canvas.drawLine(Offset(rect.left, dy), Offset(rect.right, dy), grid);
         }
+      case TemplateLayerType.shape:
+        final fill = Paint()..color = AppColors.red.withValues(alpha: 0.35);
+        if (layer.shapeKind == 'circle') {
+          canvas.drawOval(rect, fill);
+        } else {
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(rect, const Radius.circular(2)),
+            fill,
+          );
+        }
+      case TemplateLayerType.background:
+        final fill = Paint()
+          ..color = AppColors.grey.withValues(alpha: 0.12);
+        canvas.drawRect(rect, fill);
+        _drawCenteredIcon(canvas, rect, Icons.wallpaper_outlined, 0.3);
     }
   }
 
