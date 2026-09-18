@@ -1,0 +1,5 @@
+# Flutter 3.38+ lee esto automáticamente en `flutter run -d chrome`.
+# Puerto fijo: Chrome recuerda permisos de cámara por origen (host + puerto).
+server:
+  host: localhost
+  port: 8080

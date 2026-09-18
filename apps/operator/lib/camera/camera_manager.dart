@@ -5,84 +5,57 @@ import 'package:fotoboot_operator/camera/booth_camera.dart';
 import 'package:fotoboot_operator/camera/booth_camera_factory.dart';
 import 'package:fotoboot_operator/camera/booth_camera_messages.dart';
 
-/// Gestor centralizado: una sola sesión de cámara, cierre limpio, sin race conditions.
+/// Igual que b584109: el clic dispara openBoothCamera() ya, sin awaits antes.
 class CameraManager extends ChangeNotifier {
   BoothCameraSession? _session;
-  BoothCameraPermission _permission = BoothCameraPermission.prompt;
+  BoothCameraStatus _status = BoothCameraStatus.needsPermission;
   String? _error;
-  bool _isOpening = false;
-  bool _disposed = false;
-  bool _hadSession = false;
+  bool _opening = false;
+  var _disposed = false;
 
   BoothCameraSession? get session => _session;
-  BoothCameraPermission get permission => _permission;
+  BoothCameraStatus get status => _status;
   String? get error => _error;
-  bool get isOpening => _isOpening;
+  bool get isOpening => _opening;
   bool get isReady => _session?.isReady ?? false;
 
-  Future<void> openCamera({required bool fromUserGesture}) async {
-    if (_disposed) return;
-    if (_isOpening) return;
-    if (_session?.isReady == true) return;
+  Future<void> open({required bool userGesture}) async {
+    if (_disposed || _opening || isReady) return;
 
-    _isOpening = true;
+    final pending = openBoothCamera(userGesture: userGesture);
+
+    _opening = true;
     _error = null;
     notifyListeners();
 
-    final hadPrevious = _hadSession;
     try {
-      await _closeCurrentSession();
-
-      // Solo esperar si había una sesión previa (liberar hardware).
-      if (hadPrevious) {
-        await Future<void>.delayed(const Duration(milliseconds: 400));
-      }
-      if (_disposed) return;
-
-      final result = await openBoothCamera(fromUserGesture: fromUserGesture);
+      final result = await pending;
       if (_disposed) {
         await result.session?.dispose();
         return;
       }
-
+      final old = _session;
       _session = result.session;
-      _permission = result.permission;
-      _error = result.error;
-      _hadSession = result.isReady;
-
-      if (result.isReady) {
-        debugPrint('✅ CameraManager: cámara abierta');
-      } else {
-        debugPrint('⚠️ CameraManager: $_error');
-      }
+      _status = result.status;
+      _error = result.status == BoothCameraStatus.ready ? null : result.message;
+      if (old != null) unawaited(old.dispose());
     } catch (e) {
       debugPrint('❌ CameraManager: $e');
-      _error = BoothCameraMessages.unexpectedOpenError;
       _session = null;
+      _status = BoothCameraStatus.error;
+      _error = BoothCameraMessages.unexpected;
     } finally {
-      _isOpening = false;
+      _opening = false;
       if (!_disposed) notifyListeners();
-    }
-  }
-
-  Future<void> retry() => openCamera(fromUserGesture: true);
-
-  Future<void> _closeCurrentSession() async {
-    final current = _session;
-    if (current == null) return;
-
-    _session = null;
-    try {
-      await current.dispose();
-    } catch (e) {
-      debugPrint('⚠️ Error al cerrar sesión: $e');
     }
   }
 
   @override
   void dispose() {
     _disposed = true;
-    unawaited(_closeCurrentSession());
+    final current = _session;
+    _session = null;
+    unawaited(current?.dispose() ?? Future<void>.value());
     super.dispose();
   }
 }

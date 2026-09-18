@@ -39,8 +39,9 @@ class _CameraScreenState extends State<CameraScreen> {
     _cameraManager = CameraManager();
     _cameraManager.addListener(_onCameraStateChanged);
 
+    // Móvil: abrir al entrar. Web: el usuario pulsa Activar cámara (gesto).
     if (!kIsWeb) {
-      _cameraManager.openCamera(fromUserGesture: false);
+      _cameraManager.open(userGesture: false);
     }
   }
 
@@ -199,11 +200,11 @@ class _CameraScreenState extends State<CameraScreen> {
                   child: _cameraManager.isOpening
                       ? const CircularProgressIndicator(color: AppColors.white)
                       : CameraPermissionPanel(
-                          permission: _cameraManager.permission,
+                          status: _cameraManager.status,
                           message: _cameraManager.error,
                           busy: _busy,
                           onEnable: () =>
-                              _cameraManager.openCamera(fromUserGesture: true),
+                              _cameraManager.open(userGesture: true),
                           onPick: _pickFallback,
                         ),
                 ),
@@ -227,7 +228,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
               ),
             ),
-          if (ready && !_saving && _reviewBytes == null) ...[
+          if (_cameraManager.isReady && !_saving && _reviewBytes == null) ...[
             SafeArea(
               child: Align(
                 alignment: Alignment.topLeft,

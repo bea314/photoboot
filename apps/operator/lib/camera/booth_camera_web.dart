@@ -1,202 +1,201 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:js_interop';
-import 'dart:js_interop_unsafe';
 import 'dart:typed_data';
+import 'dart:ui_web' as ui_web;
 
-import 'package:camera/camera.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:fotoboot_operator/camera/booth_camera.dart';
 import 'package:fotoboot_operator/camera/booth_camera_messages.dart';
 import 'package:web/web.dart' as web;
 
-const bool kBoothCameraSupported = true;
+/// En web no usamos el plugin `camera`. Su `availableCameras()` abre y cierra
+/// la cámara dos veces (una para pedir permiso y otra por dispositivo, para
+/// leer el facingMode) antes de que `initialize()` la abra de nuevo para el
+/// preview. Safari solo concede getUserMedia dentro del gesto del usuario, así
+/// que esas llamadas encadenadas fallan, y en macOS el ciclo abrir/cerrar deja
+/// el dispositivo ocupado.
+///
+/// Aquí pedimos el stream una sola vez y montamos el <video> como platform
+/// view, que es lo que el navegador espera.
 
-/// Safari no implementa bien `navigator.permissions.query({name:'camera'})`.
-/// Solo la usamos como pista para la UI; nunca bloqueamos getUserMedia por ella.
-Future<BoothCameraPermission> requestBoothCameraPermission() {
-  return _peekPermission();
-}
+int _viewTypeSeed = 0;
 
-Future<BoothCameraOpenResult> openBoothCamera({
-  bool fromUserGesture = false,
-}) async {
-  debugPrint('📷 openBoothCamera: fromUserGesture=$fromUserGesture');
-
-  // Auto-abrir solo si el navegador reporta permiso persistente.
-  // Con gesto de usuario siempre intentamos getUserMedia (Safari/Chrome).
-  if (!fromUserGesture) {
-    final peek = await _peekPermission();
-    debugPrint('📷 Permiso (pista): $peek');
-    if (peek != BoothCameraPermission.granted) {
-      return BoothCameraOpenResult(
-        permission: peek,
-        error: BoothCameraMessages.forPermission(
-          peek == BoothCameraPermission.denied
-              ? BoothCameraPermission.denied
-              : BoothCameraPermission.prompt,
-        ),
-      );
-    }
+Future<BoothCameraResult> openBoothCamera({bool userGesture = false}) async {
+  if (!web.window.isSecureContext) {
+    return const BoothCameraResult(
+      status: BoothCameraStatus.unsupported,
+      message: BoothCameraMessages.insecureContext,
+    );
   }
 
+  if (web.window.navigator.mediaDevices.isUndefinedOrNull) {
+    return const BoothCameraResult(
+      status: BoothCameraStatus.unsupported,
+      message: BoothCameraMessages.unsupported,
+    );
+  }
+
+  web.MediaStream? stream;
   try {
-    await _stopActiveVideoTracks();
+    stream = await web.window.navigator.mediaDevices
+        .getUserMedia(
+          web.MediaStreamConstraints(
+            // facingMode como valor ideal (no `exact`): si no hay cámara
+            // frontal el navegador elige otra en vez de fallar.
+            video: <String, String>{'facingMode': 'user'}.jsify()!,
+            audio: false.toJS,
+          ),
+        )
+        .toDart;
 
-    debugPrint('🔍 Buscando cámaras...');
-    final cameras = await availableCameras();
-    debugPrint('🔍 Cámaras: ${cameras.length}');
-
-    if (cameras.isEmpty) {
-      return BoothCameraOpenResult(
-        permission: BoothCameraPermission.notFound,
-        error: BoothCameraMessages.forPermission(BoothCameraPermission.notFound),
-      );
-    }
-
-    final preferred = cameras.firstWhere(
-      (camera) => camera.lensDirection == CameraLensDirection.front,
-      orElse: () => cameras.first,
+    return BoothCameraResult(
+      status: BoothCameraStatus.ready,
+      session: await _WebCameraSession.attach(stream),
     );
-    debugPrint('📷 Cámara: ${preferred.name}');
-
-    final controller = CameraController(
-      preferred,
-      ResolutionPreset.medium,
-      enableAudio: false,
-    );
-
-    debugPrint('🔄 Inicializando...');
-    await controller.initialize();
-    debugPrint('✅ Cámara lista');
-
-    return BoothCameraOpenResult(
-      permission: BoothCameraPermission.granted,
-      session: _WebCameraSession(controller),
-    );
-  } on CameraException catch (error) {
-    debugPrint('❌ CameraException: ${error.code} - ${error.description}');
-    await _stopActiveVideoTracks();
-    return _failedOpen(error.code, error.description ?? error.code);
-  } catch (error, stack) {
-    debugPrint('❌ Error: $error\n$stack');
-    await _stopActiveVideoTracks();
-    return _failedOpen(error.toString(), error.toString());
+  } catch (error) {
+    _stopStream(stream);
+    return _resultFromError(error.toString());
   }
 }
 
-Future<BoothCameraOpenResult> _failedOpen(String code, String detail) async {
-  final text = '$code $detail'.toLowerCase();
-  debugPrint('🔍 Error: $code | $detail');
+void _stopStream(web.MediaStream? stream) {
+  if (stream == null) return;
+  for (final track in stream.getTracks().toDart) {
+    track.stop();
+  }
+}
 
-  if (text.contains('notfound') || text.contains('devicesnotfound')) {
-    return BoothCameraOpenResult(
-      permission: BoothCameraPermission.notFound,
-      error: BoothCameraMessages.forPermission(BoothCameraPermission.notFound),
+/// El navegador rechaza getUserMedia con un DOMException cuyo texto es del
+/// tipo "NotAllowedError: Permission denied".
+BoothCameraResult _resultFromError(String error) {
+  final text = error.toLowerCase();
+
+  if (text.contains('notallowed') ||
+      text.contains('permissiondenied') ||
+      text.contains('security')) {
+    return const BoothCameraResult(
+      status: BoothCameraStatus.denied,
+      message: BoothCameraMessages.denied,
+    );
+  }
+  if (text.contains('notfound') ||
+      text.contains('devicesnotfound') ||
+      text.contains('overconstrained')) {
+    return const BoothCameraResult(
+      status: BoothCameraStatus.notFound,
+      message: BoothCameraMessages.notFound,
+    );
+  }
+  if (text.contains('notreadable') ||
+      text.contains('trackstart') ||
+      text.contains('abort')) {
+    return const BoothCameraResult(
+      status: BoothCameraStatus.error,
+      message: BoothCameraMessages.busy,
     );
   }
 
-  // Denegado permanente (bloqueado en ajustes del navegador).
-  if (text.contains('permissiondenied') ||
-      text.contains('notallowederror') ||
-      text.contains('cameraaccessdenied')) {
-    final queried = await _queryPermission();
-    if (queried == BoothCameraPermission.denied) {
-      return BoothCameraOpenResult(
-        permission: BoothCameraPermission.denied,
-        error: BoothCameraMessages.forPermission(BoothCameraPermission.denied),
-      );
-    }
-    // Permiso no bloqueado pero falló: otra pestaña, cámara ocupada, o
-    // Safari necesita otro clic tras el diálogo de permiso.
-    return BoothCameraOpenResult(
-      permission: BoothCameraPermission.prompt,
-      error: BoothCameraMessages.openFailedBusy,
-    );
-  }
-
-  return BoothCameraOpenResult(
-    permission: BoothCameraPermission.prompt,
-    error: BoothCameraMessages.openFailedRetry,
+  // Dejamos el error crudo a la vista: es lo que hace falta para diagnosticar
+  // un caso que no esté contemplado arriba.
+  return BoothCameraResult(
+    status: BoothCameraStatus.error,
+    message: '${BoothCameraMessages.openFailed}\n\n$error',
   );
 }
 
-Future<BoothCameraPermission> _peekPermission() async {
-  return await _queryPermission() ?? BoothCameraPermission.prompt;
-}
-
-Future<BoothCameraPermission?> _queryPermission() async {
-  try {
-    final descriptor = JSObject();
-    descriptor.setProperty('name'.toJS, 'camera'.toJS);
-    final status =
-        await web.window.navigator.permissions.query(descriptor).toDart;
-    return switch (status.state) {
-      'granted' => BoothCameraPermission.granted,
-      'denied' => BoothCameraPermission.denied,
-      'prompt' => BoothCameraPermission.prompt,
-      _ => null,
-    };
-  } catch (_) {
-    // Safari: Permissions API no soportada → desconocido, no bloquear.
-    return null;
-  }
-}
-
-/// Libera streams de video huérfanos (crítico al reintentar en Safari/Chrome).
-Future<void> _stopActiveVideoTracks() async {
-  try {
-    final videos = web.document.querySelectorAll('video');
-    for (var i = 0; i < videos.length; i++) {
-      final node = videos.item(i);
-      if (node is! web.HTMLVideoElement) continue;
-      final stream = node.srcObject;
-      if (stream == null) continue;
-      final mediaStream = stream as web.MediaStream;
-      for (final track in mediaStream.getTracks().toDart) {
-        track.stop();
-      }
-      node.srcObject = null;
-    }
-    debugPrint('🧹 Video tracks liberados');
-  } catch (e) {
-    debugPrint('⚠️ No se pudieron liberar tracks: $e');
-  }
-}
-
 class _WebCameraSession implements BoothCameraSession {
-  _WebCameraSession(this._controller);
+  _WebCameraSession._(this._stream, this._video, this._viewType);
 
-  final CameraController _controller;
-  bool _disposed = false;
+  static Future<_WebCameraSession> attach(web.MediaStream stream) async {
+    final video = web.HTMLVideoElement()
+      ..autoplay = true
+      // Safari exige muted + playsinline para reproducir sin pantalla completa.
+      ..muted = true
+      ..srcObject = stream;
+    video.setAttribute('playsinline', 'true');
+    video.style
+      ..width = '100%'
+      ..height = '100%'
+      ..objectFit = 'cover';
+
+    final viewType = 'fotoboot-camera-${_viewTypeSeed++}';
+    ui_web.platformViewRegistry.registerViewFactory(
+      viewType,
+      (int viewId) => video,
+    );
+
+    await _waitForFirstFrame(video);
+    try {
+      await video.play().toDart;
+    } catch (_) {
+      // Autoplay bloqueado: el stream sigue vivo y la captura funciona igual.
+    }
+
+    return _WebCameraSession._(stream, video, viewType);
+  }
+
+  static Future<void> _waitForFirstFrame(web.HTMLVideoElement video) {
+    if (video.videoWidth > 0) return Future<void>.value();
+
+    final completer = Completer<void>();
+    void onReady(web.Event event) {
+      if (!completer.isCompleted) completer.complete();
+    }
+
+    final listener = onReady.toJS;
+    video.addEventListener('loadedmetadata', listener);
+
+    return completer.future
+        .timeout(const Duration(seconds: 5), onTimeout: () {})
+        .whenComplete(
+          () => video.removeEventListener('loadedmetadata', listener),
+        );
+  }
+
+  final web.MediaStream _stream;
+  final web.HTMLVideoElement _video;
+  final String _viewType;
+  var _disposed = false;
 
   @override
-  bool get isReady => !_disposed && _controller.value.isInitialized;
+  bool get isReady => !_disposed && _stream.active;
 
   @override
-  Size? get previewSize => _controller.value.previewSize;
+  Size? get previewSize {
+    final width = _video.videoWidth;
+    final height = _video.videoHeight;
+    if (width == 0 || height == 0) return null;
+    return Size(width.toDouble(), height.toDouble());
+  }
 
   @override
-  Widget buildPreview() => CameraPreview(_controller);
+  Widget buildPreview() => HtmlElementView(viewType: _viewType);
 
   @override
   Future<Uint8List> capture() async {
-    if (_disposed) {
-      throw StateError('Cámara ya cerrada');
+    final width = _video.videoWidth;
+    final height = _video.videoHeight;
+    if (width == 0 || height == 0) {
+      throw StateError('El preview todavía no tiene imagen');
     }
-    final file = await _controller.takePicture();
-    return file.readAsBytes();
+
+    final canvas = web.HTMLCanvasElement()
+      ..width = width
+      ..height = height;
+    final context = canvas.getContext('2d')! as web.CanvasRenderingContext2D;
+    context.drawImage(_video, 0, 0);
+
+    final dataUrl = canvas.toDataURL('image/jpeg', 0.92.toJS);
+    return base64Decode(dataUrl.split(',').last);
   }
 
   @override
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
-
-    try {
-      await _controller.dispose();
-    } catch (e) {
-      debugPrint('⚠️ dispose controller: $e');
-    }
-    await _stopActiveVideoTracks();
+    _video.pause();
+    _video.srcObject = null;
+    _stopStream(_stream);
   }
 }
