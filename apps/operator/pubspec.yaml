@@ -15,12 +15,14 @@ dependencies:
   http_parser: ^4.1.2
   flutter_secure_storage: ^9.2.4
   qr_flutter: ^4.1.0
+  # Solo Android/iOS (booth_camera_mobile.dart). Web usa getUserMedia nativo.
   camera: ^0.11.1
   web: ^1.1.1
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   uuid: ^4.5.1
   flutter_staggered_grid_view: ^0.7.0
+  # Web / escritorio / fallback: elegir o capturar imagen sin preview en vivo.
   image_picker: ^1.1.2
   image: ^4.5.4
 

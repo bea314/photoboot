@@ -7,15 +7,27 @@ abstract final class BoothCameraMessages {
   static const retry = 'Reintentar';
 
   static const idle =
-      'Pulsa Activar cámara. Chrome pedirá permiso en esta pestaña.';
+      'Pulsa Activar cámara. El navegador pedirá permiso en esta pestaña.';
 
   static const unsupported =
-      'La cámara no está disponible en esta plataforma.';
+      'La cámara en vivo no está disponible en esta plataforma.';
+
+  static const desktopHint =
+      'En escritorio usa Elegir foto para tomar o subir una imagen.';
 
   static const notFound = 'No se encontró ninguna cámara.';
 
   static const denied =
       'Permiso denegado. En la barra de dirección (🔒), permite Cámara para este sitio.';
+
+  /// `Permission denied by system`: el sitio tiene permiso pero macOS niega el
+  /// hardware. Con `flutter run -d chrome`, Chrome lo lanza Terminal/Cursor:
+  /// hay que activar Cámara también para Cursor (o Terminal/iTerm), no solo
+  /// para Google Chrome. Ver README → Cámara en web.
+  static const systemDenied =
+      'macOS bloqueó la cámara (Permission denied by system). '
+      'Ajustes del Sistema → Privacidad → Cámara → activa Cursor y Google Chrome. '
+      'Cierra Chrome (Cmd+Q), reinicia flutter run y pulsa Activar cámara.';
 
   static const insecureContext =
       'La cámara web solo funciona en localhost o HTTPS.';

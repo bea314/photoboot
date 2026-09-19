@@ -7,3 +7,5 @@ Future<BoothCameraResult> openBoothCamera({bool userGesture = false}) async {
     message: BoothCameraMessages.unsupported,
   );
 }
+
+Stream<void> watchWebCameraPermissionGranted() => const Stream.empty();

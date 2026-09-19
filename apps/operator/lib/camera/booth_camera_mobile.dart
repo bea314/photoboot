@@ -5,7 +5,8 @@ import 'package:flutter/widgets.dart';
 import 'package:fotoboot_operator/camera/booth_camera.dart';
 import 'package:fotoboot_operator/camera/booth_camera_messages.dart';
 
-Future<BoothCameraResult> openBoothCamera({bool userGesture = false}) async {
+/// Android / iOS: plugin oficial [camera] con preview en vivo.
+Future<BoothCameraResult> openMobileBoothCamera() async {
   CameraController? controller;
   try {
     final cameras = await availableCameras();
@@ -43,17 +44,26 @@ Future<BoothCameraResult> openBoothCamera({bool userGesture = false}) async {
     );
   } on CameraException catch (e) {
     await controller?.dispose();
+    final status = _statusFromCameraException(e);
     return BoothCameraResult(
-      status: _statusFromCameraException(e),
-      message: e.description ?? e.code,
+      status: status,
+      message: _messageForStatus(status),
     );
-  } catch (e) {
+  } catch (_) {
     await controller?.dispose();
-    return BoothCameraResult(
+    return const BoothCameraResult(
       status: BoothCameraStatus.error,
-      message: e.toString(),
+      message: BoothCameraMessages.openFailed,
     );
   }
+}
+
+String _messageForStatus(BoothCameraStatus status) {
+  return switch (status) {
+    BoothCameraStatus.denied => BoothCameraMessages.denied,
+    BoothCameraStatus.notFound => BoothCameraMessages.notFound,
+    _ => BoothCameraMessages.openFailed,
+  };
 }
 
 BoothCameraStatus _statusFromCameraException(CameraException e) {
@@ -80,7 +90,17 @@ class _MobileSession implements BoothCameraSession {
   Size? get previewSize => _controller.value.previewSize;
 
   @override
-  Widget buildPreview() => CameraPreview(_controller);
+  Widget buildPreview() {
+    final size = previewSize;
+    return FittedBox(
+      fit: BoxFit.cover,
+      child: SizedBox(
+        width: size?.width ?? 4,
+        height: size?.height ?? 3,
+        child: CameraPreview(_controller),
+      ),
+    );
+  }
 
   @override
   Future<Uint8List> capture() async {

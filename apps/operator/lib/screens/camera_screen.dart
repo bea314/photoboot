@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:fotoboot_operator/camera/camera_manager.dart';
 import 'package:fotoboot_operator/services/photo_controller.dart';
@@ -38,11 +37,9 @@ class _CameraScreenState extends State<CameraScreen> {
     super.initState();
     _cameraManager = CameraManager();
     _cameraManager.addListener(_onCameraStateChanged);
-
-    // Móvil: abrir al entrar. Web: el usuario pulsa Activar cámara (gesto).
-    if (!kIsWeb) {
-      _cameraManager.open(userGesture: false);
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _cameraManager.prepare();
+    });
   }
 
   @override
@@ -175,7 +172,6 @@ class _CameraScreenState extends State<CameraScreen> {
   Widget build(BuildContext context) {
     final session = _cameraManager.session;
     final ready = _cameraManager.isReady;
-    final previewSize = session?.previewSize;
 
     return Scaffold(
       backgroundColor: AppColors.black,
@@ -183,14 +179,7 @@ class _CameraScreenState extends State<CameraScreen> {
         fit: StackFit.expand,
         children: [
           if (ready && session != null)
-            FittedBox(
-              fit: BoxFit.cover,
-              child: SizedBox(
-                width: previewSize?.width ?? 4,
-                height: previewSize?.height ?? 3,
-                child: session.buildPreview(),
-              ),
-            )
+            session.buildPreview()
           else
             ColoredBox(
               color: AppColors.black,

@@ -11,12 +11,35 @@ Abre **http://localhost:8080** en Chrome. El puerto fijo está en `web_dev_confi
 
 ## Cámara en web
 
-Chrome guarda el permiso **por origen** (protocolo + host + puerto). Con el puerto 8080 fijo, no tienes que volver a permitir en cada ejecución.
+Puerto fijo **8080** en `web_dev_config.yaml` (Chrome recuerda permisos por origen).
 
-1. Pulsa **Activar cámara** → **Permitir** cuando Chrome lo pregunte.
-2. Si sigue bloqueada: candado (🔒) en la barra → **Cámara** → **Permitir** (o **Restablecer permisos**).
+### Permisos en macOS (importante con `flutter run -d chrome`)
 
-**Nota:** `http://localhost` es contexto seguro para la cámara. No abras la app por IP (`192.168.x.x`); Chrome la bloqueará.
+Flutter **lanza Chrome desde Cursor/Terminal**. macOS exige cámara para **la app que abre Chrome**, no solo para Chrome:
+
+**Ajustes del Sistema → Privacidad y seguridad → Cámara** → activa:
+
+- **Google Chrome**
+- **Cursor** (o **Terminal** / **iTerm**, según desde dónde corras `flutter run`)
+
+Si ves en consola `Permission denied by system`, casi siempre falta **Cursor** o **Terminal** en esa lista. Cierra Chrome (Cmd+Q), vuelve a `flutter run -d chrome`, pulsa **Activar cámara** → **Permitir**.
+
+### Uso en la app
+
+1. Pulsa **Activar cámara** → **Permitir** en la pestaña.
+2. Si falla: candado (🔒) → **Cámara** → **Permitir**.
+
+### Alternativa si sigue fallando
+
+Abre Chrome tú (ventana normal, no la de Flutter) y usa el servidor web:
+
+```bash
+flutter run -d web-server
+```
+
+Luego entra a **http://localhost:8080** en Chrome. Solo hace falta permiso de cámara para Chrome.
+
+**Nota:** `http://localhost` es contexto seguro. No uses IP (`192.168.x.x`).
 
 Si el tooling pide regenerar plataformas:
 

@@ -36,14 +36,6 @@ class CameraPermissionPanel extends StatelessWidget {
             textAlign: TextAlign.center,
             style: const TextStyle(color: AppColors.white, fontSize: 18),
           ),
-          if (status == BoothCameraStatus.unsupported) ...[
-            const SizedBox(height: 8),
-            const Text(
-              BoothCameraMessages.unsupported,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.grey, fontSize: 14),
-            ),
-          ],
           const SizedBox(height: 24),
           if (status != BoothCameraStatus.unsupported)
             FilledButton(
