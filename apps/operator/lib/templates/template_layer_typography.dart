@@ -46,6 +46,11 @@ abstract final class TemplateFontCatalog {
 
 enum TemplateTextPresetId { title, subtitle, body }
 
+/// Shared typography defaults (UI + renderer).
+abstract final class TemplateTextDefaults {
+  static const defaultMaxLines = 2;
+}
+
 /// Preset sizes in typographic points (physical — scales with paper mm).
 abstract final class TemplateTextPresets {
   static const title = TemplateTextPresetId.title;
@@ -70,14 +75,14 @@ abstract final class TemplateTextPresets {
           fontSizePt: 14,
           fontWeight: 'bold',
           textAlign: 'center',
-          maxLines: 2,
+          maxLines: TemplateTextDefaults.defaultMaxLines,
         );
       case TemplateTextPresetId.subtitle:
         return layer.copyWith(
           fontSizePt: 11,
           fontWeight: 'medium',
           textAlign: 'center',
-          maxLines: 2,
+          maxLines: TemplateTextDefaults.defaultMaxLines,
         );
       case TemplateTextPresetId.body:
         return layer.copyWith(
@@ -171,20 +176,33 @@ TextStyle painterTextStyle(
 }
 
 /// Ensures bundled Google Fonts for typography layers are loaded before raster paint.
-Future<void> preloadTemplateTypographyFonts(PrintTemplate template) async {
+Future<void> preloadTemplateTypographyFonts(
+  PrintTemplate template, {
+  double canvasWidthPx = 576,
+}) async {
   final paper = template.paper;
-  final paperRect = Rect.fromLTWH(0, 0, 1000, 1000 / paper.aspectRatio);
+  final paperRect = Rect.fromLTWH(
+    0,
+    0,
+    canvasWidthPx,
+    canvasWidthPx / paper.aspectRatio,
+  );
   for (final layer in template.layers) {
     if (layer.type != TemplateLayerType.text || !layerHasTypography(layer)) {
       continue;
     }
-    final rect = Rect.fromLTWH(
+    final layerRect = Rect.fromLTWH(
       paperRect.left + layer.x * paperRect.width,
       paperRect.top + layer.y * paperRect.height,
       layer.w * paperRect.width,
       layer.h * paperRect.height,
     );
-    final resolved = resolveTextStyle(layer, paper, rect);
+    final resolved = resolveTextStyle(
+      layer,
+      paper,
+      layerRect,
+      paperRect,
+    );
     painterTextStyle(layer, resolved);
   }
   await GoogleFonts.pendingFonts();
@@ -228,40 +246,55 @@ TextAlign templateTextAlign(String? raw, {required TextAlign legacy}) {
   }
 }
 
-/// Converts typographic pt on [paper] to canvas pixels for [layerRect] height scale.
-double fontSizePxFromPt(double pt, TemplatePaper paper, Rect layerRect) {
-  final mm = pt * 25.4 / 72;
-  return mm / paper.heightMm * layerRect.height;
+/// Physical scale: canvas pixels per mm on the fitted paper rect.
+double templatePixelsPerMm(TemplatePaper paper, Rect paperRect) {
+  return paperRect.width / paper.widthMm;
 }
 
-double strokeWidthPxFromMm(double mm, TemplatePaper paper, Rect layerRect) {
-  return mm / paper.heightMm * layerRect.height;
+double mmFromPt(double pt) => pt * 25.4 / 72;
+
+/// Typographic pt → canvas px using [paperRect] width (not layer box height).
+double fontSizePxFromPt(
+  double pt,
+  TemplatePaper paper,
+  Rect paperRect,
+) {
+  return mmFromPt(pt) * templatePixelsPerMm(paper, paperRect);
+}
+
+double strokeWidthPxFromMm(
+  double mm,
+  TemplatePaper paper,
+  Rect paperRect,
+) {
+  return mm * templatePixelsPerMm(paper, paperRect);
 }
 
 /// Legacy Corte A/B text when optional typography fields are absent.
 TemplateResolvedTextStyle resolveTextStyle(
   TemplateLayer layer,
   TemplatePaper paper,
-  Rect rect,
+  Rect layerRect,
+  Rect paperRect,
 ) {
   final hasTypography = layerHasTypography(layer);
 
   if (!hasTypography) {
-    final fontSize = (rect.height * 0.55).clamp(10.0, 36.0);
+    final fontSize = (layerRect.height * 0.55).clamp(10.0, 36.0);
     return TemplateResolvedTextStyle(
       fontSize: fontSize,
       fontWeight: FontWeight.w600,
       fontFamily: TemplateFontCatalog.defaultFamily,
       textAlign: TextAlign.center,
       color: AppColors.black,
-      maxLines: 2,
+      maxLines: TemplateTextDefaults.defaultMaxLines,
       legacy: true,
     );
   }
 
   final pt = layer.fontSizePt ?? 9;
   return TemplateResolvedTextStyle(
-    fontSize: fontSizePxFromPt(pt, paper, rect),
+    fontSize: fontSizePxFromPt(pt, paper, paperRect),
     fontWeight: templateFontWeight(
       layer.fontWeight,
       legacy: FontWeight.w400,
@@ -272,7 +305,7 @@ TemplateResolvedTextStyle resolveTextStyle(
       legacy: TextAlign.center,
     ),
     color: parseTemplateHex(layer.color) ?? AppColors.black,
-    maxLines: layer.maxLines ?? 4,
+    maxLines: layer.maxLines ?? TemplateTextDefaults.defaultMaxLines,
     lineHeight: layer.lineHeight,
     legacy: false,
   );

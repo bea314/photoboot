@@ -161,9 +161,8 @@ class TemplateLayerPropsPanel extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _TextTypographyFields(
+            controller: controller,
             layer: layer,
-            paper: paper,
-            onUpdate: (next) => controller.updateLayer(next),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -250,26 +249,29 @@ class TemplateLayerPropsPanel extends StatelessWidget {
             },
           ),
           _mmSlider(
+            controller: controller,
+            layerId: layer.id,
             label: 'Grosor borde (mm)',
             value: layer.strokeWidthMm ?? 0.25,
             min: 0.1,
             max: 2,
-            onChanged: (v) =>
-                controller.updateLayer(layer.copyWith(strokeWidthMm: v)),
+            apply: (l, v) => l.copyWith(strokeWidthMm: v),
           ),
           _normalizedSlider(
+            controller: controller,
+            layerId: layer.id,
             label: 'Radio esquina',
             value: layer.cornerRadius ?? 0,
             enabled: layer.shapeKind == 'rect' ||
                 layer.shapeKind == 'roundedRect' ||
                 layer.shapeKind == null,
-            onChanged: (v) =>
-                controller.updateLayer(layer.copyWith(cornerRadius: v)),
+            apply: (l, v) => l.copyWith(cornerRadius: v),
           ),
           _opacitySlider(
-            layer,
-            onChanged: (v) =>
-                controller.updateLayer(layer.copyWith(opacity: v)),
+            controller: controller,
+            layerId: layer.id,
+            layer: layer,
+            apply: (l, v) => l.copyWith(opacity: v),
           ),
         ]);
     }
@@ -438,20 +440,19 @@ class _TextPresetRow extends StatelessWidget {
 
 class _TextTypographyFields extends StatelessWidget {
   const _TextTypographyFields({
+    required this.controller,
     required this.layer,
-    required this.paper,
-    required this.onUpdate,
   });
 
+  final TemplateEditorController controller;
   final TemplateLayer layer;
-  final TemplatePaper paper;
-  final ValueChanged<TemplateLayer> onUpdate;
 
   @override
   Widget build(BuildContext context) {
     final pt = layer.fontSizePt ?? 9;
     final weight = layer.fontWeight ?? 'regular';
     final align = layer.textAlign ?? 'center';
+    final lineHeight = layer.lineHeight ?? 1.2;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -470,7 +471,7 @@ class _TextTypographyFields extends StatelessWidget {
             SizedBox(
               width: 120,
               child: TextFormField(
-                key: ValueKey('pt-${layer.id}-$pt'),
+                key: ValueKey('pt-field-${layer.id}'),
                 initialValue: pt.toStringAsFixed(1),
                 decoration: const InputDecoration(
                   isDense: true,
@@ -483,20 +484,24 @@ class _TextTypographyFields extends StatelessWidget {
                 onFieldSubmitted: (raw) {
                   final v = double.tryParse(raw.replaceAll(',', '.'));
                   if (v != null) {
-                    onUpdate(layer.copyWith(fontSizePt: v.clamp(6, 48)));
+                    controller.updateLayer(
+                      layer.copyWith(fontSizePt: v.clamp(6, 48)),
+                    );
                   }
                 },
               ),
             ),
           ],
         ),
-        Slider(
-          value: pt.clamp(6, 48),
+        _liveSlider(
+          controller: controller,
+          layerId: layer.id,
+          value: pt,
           min: 6,
           max: 48,
           divisions: 84,
           label: '${pt.toStringAsFixed(1)} pt',
-          onChanged: (v) => onUpdate(layer.copyWith(fontSizePt: v)),
+          apply: (l, v) => l.copyWith(fontSizePt: v),
         ),
         DropdownButtonFormField<String>(
           key: ValueKey('weight-${layer.id}-$weight'),
@@ -512,7 +517,7 @@ class _TextTypographyFields extends StatelessWidget {
           ],
           onChanged: (v) {
             if (v == null) return;
-            onUpdate(layer.copyWith(fontWeight: v));
+            controller.updateLayer(layer.copyWith(fontWeight: v));
           },
         ),
         const SizedBox(height: 8),
@@ -529,7 +534,7 @@ class _TextTypographyFields extends StatelessWidget {
           ],
           onChanged: (v) {
             if (v == null) return;
-            onUpdate(layer.copyWith(fontFamily: v));
+            controller.updateLayer(layer.copyWith(fontFamily: v));
           },
         ),
         const SizedBox(height: 8),
@@ -544,7 +549,7 @@ class _TextTypographyFields extends StatelessWidget {
           ],
           selected: {align},
           onSelectionChanged: (set) {
-            onUpdate(layer.copyWith(textAlign: set.first));
+            controller.updateLayer(layer.copyWith(textAlign: set.first));
           },
         ),
         const SizedBox(height: 12),
@@ -553,69 +558,157 @@ class _TextTypographyFields extends StatelessWidget {
           valueHex: layer.color ?? '#000000',
           onChanged: (hex) {
             if (hex == null) {
-              onUpdate(layer.copyWith(clearColor: true));
+              controller.updateLayer(layer.copyWith(clearColor: true));
             } else {
-              onUpdate(layer.copyWith(color: hex));
+              controller.updateLayer(layer.copyWith(color: hex));
             }
           },
         ),
+        const SizedBox(height: 12),
+        Text('Interlineado: ${lineHeight.toStringAsFixed(2)}'),
+        _liveSlider(
+          controller: controller,
+          layerId: layer.id,
+          value: lineHeight,
+          min: 0.8,
+          max: 2.4,
+          divisions: 32,
+          apply: (l, v) => l.copyWith(lineHeight: v),
+        ),
         const SizedBox(height: 8),
-        _intField(
-          label: 'Máx. líneas',
-          value: layer.maxLines ?? 2,
-          onChanged: (v) => onUpdate(layer.copyWith(maxLines: v.clamp(1, 12))),
+        _MaxLinesField(
+          layerId: layer.id,
+          value: layer.maxLines ?? TemplateTextDefaults.defaultMaxLines,
+          onCommit: (v) => controller.updateLayer(
+            layer.copyWith(maxLines: v.clamp(1, 12)),
+          ),
         ),
       ],
     );
   }
+}
 
-  Widget _intField({
-    required String label,
-    required int value,
-    required ValueChanged<int> onChanged,
-  }) {
+class _MaxLinesField extends StatefulWidget {
+  const _MaxLinesField({
+    required this.layerId,
+    required this.value,
+    required this.onCommit,
+  });
+
+  final String layerId;
+  final int value;
+  final ValueChanged<int> onCommit;
+
+  @override
+  State<_MaxLinesField> createState() => _MaxLinesFieldState();
+}
+
+class _MaxLinesFieldState extends State<_MaxLinesField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: '${widget.value}');
+  }
+
+  @override
+  void didUpdateWidget(covariant _MaxLinesField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.layerId != widget.layerId) {
+      _controller.text = '${widget.value}';
+    } else if (oldWidget.value != widget.value &&
+        _controller.text != '${widget.value}') {
+      _controller.text = '${widget.value}';
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return TextFormField(
-      key: ValueKey('$label-$value'),
-      initialValue: '$value',
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
+      controller: _controller,
+      decoration: const InputDecoration(
+        labelText: 'Máx. líneas',
+        border: OutlineInputBorder(),
       ),
       keyboardType: TextInputType.number,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      onChanged: (raw) {
+      onFieldSubmitted: (raw) {
         final v = int.tryParse(raw);
-        if (v != null) onChanged(v);
+        if (v != null) widget.onCommit(v);
+      },
+      onTapOutside: (_) {
+        final v = int.tryParse(_controller.text);
+        if (v != null) widget.onCommit(v);
+        FocusScope.of(context).unfocus();
       },
     );
   }
 }
 
+Widget _liveSlider({
+  required TemplateEditorController controller,
+  required String layerId,
+  required double value,
+  required double min,
+  required double max,
+  required TemplateLayer Function(TemplateLayer layer, double v) apply,
+  int? divisions,
+  String? label,
+}) {
+  return Slider(
+    value: value.clamp(min, max),
+    min: min,
+    max: max,
+    divisions: divisions,
+    label: label,
+    onChangeStart: (_) => controller.beginGesture(),
+    onChanged: (v) {
+      final current = controller.selectedLayer;
+      if (current == null || current.id != layerId) return;
+      controller.mutateLayerLive(apply(current, v));
+    },
+    onChangeEnd: (_) => controller.endGesture(),
+  );
+}
+
 Widget _mmSlider({
+  required TemplateEditorController controller,
+  required String layerId,
   required String label,
   required double value,
   required double min,
   required double max,
-  required ValueChanged<double> onChanged,
+  required TemplateLayer Function(TemplateLayer layer, double v) apply,
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text('$label: ${value.toStringAsFixed(2)}'),
-      Slider(
-        value: value.clamp(min, max),
+      _liveSlider(
+        controller: controller,
+        layerId: layerId,
+        value: value,
         min: min,
         max: max,
-        onChanged: onChanged,
+        apply: apply,
       ),
     ],
   );
 }
 
 Widget _normalizedSlider({
+  required TemplateEditorController controller,
+  required String layerId,
   required String label,
   required double value,
-  required ValueChanged<double> onChanged,
+  required TemplateLayer Function(TemplateLayer layer, double v) apply,
   bool enabled = true,
 }) {
   return Opacity(
@@ -626,11 +719,13 @@ Widget _normalizedSlider({
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('$label: ${(value * 100).toStringAsFixed(0)} %'),
-          Slider(
-            value: value.clamp(0, 0.5),
+          _liveSlider(
+            controller: controller,
+            layerId: layerId,
+            value: value,
             min: 0,
             max: 0.5,
-            onChanged: onChanged,
+            apply: apply,
           ),
         ],
       ),
@@ -638,19 +733,23 @@ Widget _normalizedSlider({
   );
 }
 
-Widget _opacitySlider(
-  TemplateLayer layer, {
-  required ValueChanged<double> onChanged,
+Widget _opacitySlider({
+  required TemplateEditorController controller,
+  required String layerId,
+  required TemplateLayer layer,
+  required TemplateLayer Function(TemplateLayer layer, double v) apply,
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text('Opacidad: ${(layer.opacity * 100).round()} %'),
-      Slider(
-        value: layer.opacity.clamp(0, 1),
+      _liveSlider(
+        controller: controller,
+        layerId: layerId,
+        value: layer.opacity,
         min: 0,
         max: 1,
-        onChanged: onChanged,
+        apply: apply,
       ),
     ],
   );

@@ -17,15 +17,52 @@ void main() {
       text: 'Hola',
     );
     const paper = TemplateSeed.thermalPaper;
-    const rect = Rect.fromLTWH(0, 0, 400, 50);
-    final style = resolveTextStyle(layer, paper, rect);
+    const paperRect = Rect.fromLTWH(0, 0, 400, 50);
+    final style = resolveTextStyle(layer, paper, paperRect, paperRect);
     expect(style.fontWeight, FontWeight.w600);
     expect(style.textAlign, TextAlign.center);
     expect(style.maxLines, 2);
     expect(style.fontSize, closeTo(27.5, 0.1)); // 0.55 * 50
   });
 
-  test('fontSizePt scales with paper mm not screen px', () {
+  test('14pt on 576px/80mm canvas is ~35.6px independent of layer height', () {
+    const paper = TemplateSeed.thermalPaper;
+    const paperRect = Rect.fromLTWH(0, 0, 576, 720);
+    const base = TemplateLayer(
+      id: 't',
+      type: TemplateLayerType.text,
+      x: 0.1,
+      y: 0.1,
+      w: 0.8,
+      h: 0.08,
+      text: 'Title',
+      fontSizePt: 14,
+      fontWeight: 'bold',
+    );
+    final shortBox = Rect.fromLTWH(57.6, 72, 460.8, 57.6);
+    final tallBox = Rect.fromLTWH(57.6, 72, 460.8, 360);
+    final shortStyle = resolveTextStyle(base, paper, shortBox, paperRect);
+    final tallStyle = resolveTextStyle(
+      base.copyWith(h: 0.5),
+      paper,
+      tallBox,
+      paperRect,
+    );
+    expect(shortStyle.fontSize, closeTo(35.6, 0.2));
+    expect(tallStyle.fontSize, closeTo(35.6, 0.2));
+    expect(shortStyle.fontSize, tallStyle.fontSize);
+  });
+
+  test('strokeWidthPxFromMm on 576px/80mm thermal is ~2.5px for 0.35mm', () {
+    const paper = TemplateSeed.thermalPaper;
+    const paperRect = Rect.fromLTWH(0, 0, 576, 720);
+    expect(
+      strokeWidthPxFromMm(0.35, paper, paperRect),
+      closeTo(2.52, 0.05),
+    );
+  });
+
+  test('unset maxLines uses TemplateTextDefaults in renderer', () {
     const layer = TemplateLayer(
       id: 't',
       type: TemplateLayerType.text,
@@ -33,15 +70,14 @@ void main() {
       y: 0,
       w: 1,
       h: 0.1,
-      text: 'Hola',
-      fontSizePt: 12,
+      text: 'X',
+      fontSizePt: 10,
     );
     const paper = TemplateSeed.thermalPaper;
-    const rectSmall = Rect.fromLTWH(0, 0, 200, 20);
-    const rectLarge = Rect.fromLTWH(0, 0, 600, 60);
-    final small = resolveTextStyle(layer, paper, rectSmall).fontSize;
-    final large = resolveTextStyle(layer, paper, rectLarge).fontSize;
-    expect(large / small, closeTo(3, 0.01));
+    const paperRect = Rect.fromLTWH(0, 0, 576, 720);
+    const layerRect = Rect.fromLTWH(0, 0, 576, 72);
+    final style = resolveTextStyle(layer, paper, layerRect, paperRect);
+    expect(style.maxLines, TemplateTextDefaults.defaultMaxLines);
   });
 
   test('JSON round-trip keeps Corte C typography and shape stroke', () {

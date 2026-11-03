@@ -98,6 +98,35 @@ void main() {
     expect(c.template.slotCount, 3);
   });
 
+  test('editor gesture batching for live slider mutation', () {
+    const layer = TemplateLayer(
+      id: 'shape',
+      type: TemplateLayerType.shape,
+      x: 0.2,
+      y: 0.2,
+      w: 0.4,
+      h: 0.2,
+      strokeWidthMm: 0.25,
+    );
+    final c = TemplateEditorController(
+      initial: PrintTemplate(
+        id: 't',
+        name: 'T',
+        paper: TemplateSeed.thermalPaper,
+        layers: const [layer],
+      ),
+    );
+    c.selectLayer('shape');
+    c.beginGesture();
+    c.mutateLayerLive(layer.copyWith(strokeWidthMm: 0.5));
+    c.mutateLayerLive(layer.copyWith(strokeWidthMm: 1.0));
+    c.endGesture();
+    expect(c.template.layers.first.strokeWidthMm, 1.0);
+    expect(c.canUndo, isTrue);
+    c.undo();
+    expect(c.template.layers.first.strokeWidthMm, 0.25);
+  });
+
   test('validation blocks activate with duplicate slot indices', () {
     final template = PrintTemplate(
       id: 'bad',

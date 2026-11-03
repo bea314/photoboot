@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -36,11 +37,11 @@ class TemplateLayoutPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paper = fitPaperRect(size, template.paper.aspectRatio);
-    canvas.drawRect(paper, Paint()..color = Colors.white);
+    final paperRect = fitPaperRect(size, template.paper.aspectRatio);
+    canvas.drawRect(paperRect, Paint()..color = Colors.white);
     if (showPaperBorder) {
       canvas.drawRect(
-        paper,
+        paperRect,
         Paint()
           ..color = AppColors.red.withValues(alpha: 0.35)
           ..style = PaintingStyle.stroke
@@ -55,9 +56,14 @@ class TemplateLayoutPainter extends CustomPainter {
 
     for (final layer in template.layers) {
       if (!layer.visible) continue;
-      final rect = layerRect(paper, layer);
+      final rect = layerRect(paperRect, layer);
+      final saveInflate = _opacityLayerInflate(
+        layer,
+        template.paper,
+        paperRect,
+      );
       canvas.saveLayer(
-        rect.inflate(2),
+        rect.inflate(saveInflate),
         Paint()..color = Colors.white.withValues(alpha: layer.opacity),
       );
       switch (layer.type) {
@@ -73,11 +79,17 @@ class TemplateLayoutPainter extends CustomPainter {
         case TemplateLayerType.image:
           _paintImage(canvas, rect, layer);
         case TemplateLayerType.text:
-          _paintText(canvas, rect, context.resolve(layer.text), layer);
+          _paintText(
+            canvas,
+            paperRect,
+            rect,
+            context.resolve(layer.text),
+            layer,
+          );
         case TemplateLayerType.qr:
           _paintQr(canvas, rect, _qrPayload(layer));
         case TemplateLayerType.shape:
-          _paintShape(canvas, rect, layer);
+          _paintShape(canvas, paperRect, rect, layer);
       }
       canvas.restore();
 
@@ -212,11 +224,30 @@ class TemplateLayoutPainter extends CustomPainter {
     );
   }
 
-  void _paintShape(Canvas canvas, Rect rect, TemplateLayer layer) {
+  double _opacityLayerInflate(
+    TemplateLayer layer,
+    TemplatePaper paper,
+    Rect paperRect,
+  ) {
+    var inflate = 2.0;
+    if (layer.type == TemplateLayerType.shape) {
+      final mm = layer.strokeWidthMm ?? 0.25;
+      final strokePx = strokeWidthPxFromMm(mm, paper, paperRect);
+      inflate = math.max(inflate, strokePx / 2 + 0.5);
+    }
+    return inflate;
+  }
+
+  void _paintShape(
+    Canvas canvas,
+    Rect paperRect,
+    Rect rect,
+    TemplateLayer layer,
+  ) {
     final paper = template.paper;
     final strokeW = layer.strokeWidthMm == null
         ? 2.0
-        : strokeWidthPxFromMm(layer.strokeWidthMm!, paper, rect)
+        : strokeWidthPxFromMm(layer.strokeWidthMm!, paper, paperRect)
             .clamp(0.5, 24.0);
     final strokeColor =
         _parseHex(layer.strokeColor) ?? AppColors.black.withValues(alpha: 0.85);
@@ -273,12 +304,18 @@ class TemplateLayoutPainter extends CustomPainter {
 
   void _paintText(
     Canvas canvas,
+    Rect paperRect,
     Rect rect,
     String text,
     TemplateLayer layer,
   ) {
     if (text.isEmpty) return;
-    final style = resolveTextStyle(layer, template.paper, rect);
+    final style = resolveTextStyle(
+      layer,
+      template.paper,
+      rect,
+      paperRect,
+    );
     final tp = TextPainter(
       text: TextSpan(
         text: text,
@@ -453,7 +490,10 @@ class TemplateComposer {
       assets[entry.key] = await _decode(entry.value);
     }
 
-    await preloadTemplateTypographyFonts(template);
+    await preloadTemplateTypographyFonts(
+      template,
+      canvasWidthPx: widthPx.toDouble(),
+    );
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
