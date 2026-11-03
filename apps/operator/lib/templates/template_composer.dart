@@ -453,6 +453,8 @@ class TemplateComposer {
       assets[entry.key] = await _decode(entry.value);
     }
 
+    await preloadTemplateTypographyFonts(template);
+
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     final size = Size(widthPx.toDouble(), heightPx.toDouble());

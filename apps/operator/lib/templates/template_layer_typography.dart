@@ -19,6 +19,29 @@ abstract final class TemplateFontCatalog {
     if (raw == null || raw.isEmpty) return defaultFamily;
     return entries.containsKey(raw) ? raw : defaultFamily;
   }
+
+  /// [GoogleFonts] API family id (filename prefix before `-Regular.ttf`).
+  static String googleApiFamily(String catalogKey) {
+    switch (catalogKey) {
+      case 'Open Sans':
+        return 'OpenSans';
+      default:
+        return catalogKey;
+    }
+  }
+
+  /// Bundled `.ttf` weight suffixes required for selector + presets (offline).
+  static List<String> bundledWeightSuffixes(String catalogKey) {
+    if (catalogKey == 'Lato') {
+      // Lato has no separate Medium static file; w500 maps to Regular.
+      return const ['Regular', 'Bold'];
+    }
+    return const ['Regular', 'Medium', 'Bold'];
+  }
+
+  static String bundledAssetBasename(String catalogKey, String weightSuffix) {
+    return '${googleApiFamily(catalogKey)}-$weightSuffix.ttf';
+  }
 }
 
 enum TemplateTextPresetId { title, subtitle, body }
@@ -145,6 +168,26 @@ TextStyle painterTextStyle(
     );
   }
   return buildTemplateTextStyle(resolved);
+}
+
+/// Ensures bundled Google Fonts for typography layers are loaded before raster paint.
+Future<void> preloadTemplateTypographyFonts(PrintTemplate template) async {
+  final paper = template.paper;
+  final paperRect = Rect.fromLTWH(0, 0, 1000, 1000 / paper.aspectRatio);
+  for (final layer in template.layers) {
+    if (layer.type != TemplateLayerType.text || !layerHasTypography(layer)) {
+      continue;
+    }
+    final rect = Rect.fromLTWH(
+      paperRect.left + layer.x * paperRect.width,
+      paperRect.top + layer.y * paperRect.height,
+      layer.w * paperRect.width,
+      layer.h * paperRect.height,
+    );
+    final resolved = resolveTextStyle(layer, paper, rect);
+    painterTextStyle(layer, resolved);
+  }
+  await GoogleFonts.pendingFonts();
 }
 
 Color? parseTemplateHex(String? raw) {
