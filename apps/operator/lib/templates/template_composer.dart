@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -57,13 +56,18 @@ class TemplateLayoutPainter extends CustomPainter {
     for (final layer in template.layers) {
       if (!layer.visible) continue;
       final rect = layerRect(paperRect, layer);
-      final saveInflate = _opacityLayerInflate(
-        layer,
-        template.paper,
-        paperRect,
+      final resolvedText = layer.type == TemplateLayerType.text
+          ? context.resolve(layer.text)
+          : '';
+      final saveBounds = templateLayerSaveLayerRect(
+        layer: layer,
+        paper: template.paper,
+        paperRect: paperRect,
+        layerRect: rect,
+        text: resolvedText,
       );
       canvas.saveLayer(
-        rect.inflate(saveInflate),
+        saveBounds,
         Paint()..color = Colors.white.withValues(alpha: layer.opacity),
       );
       switch (layer.type) {
@@ -224,20 +228,6 @@ class TemplateLayoutPainter extends CustomPainter {
     );
   }
 
-  double _opacityLayerInflate(
-    TemplateLayer layer,
-    TemplatePaper paper,
-    Rect paperRect,
-  ) {
-    var inflate = 2.0;
-    if (layer.type == TemplateLayerType.shape) {
-      final mm = layer.strokeWidthMm ?? 0.25;
-      final strokePx = strokeWidthPxFromMm(mm, paper, paperRect);
-      inflate = math.max(inflate, strokePx / 2 + 0.5);
-    }
-    return inflate;
-  }
-
   void _paintShape(
     Canvas canvas,
     Rect paperRect,
@@ -309,41 +299,15 @@ class TemplateLayoutPainter extends CustomPainter {
     String text,
     TemplateLayer layer,
   ) {
-    if (text.isEmpty) return;
-    final style = resolveTextStyle(
-      layer,
-      template.paper,
-      rect,
-      paperRect,
+    final layout = layoutTemplateText(
+      layer: layer,
+      paper: template.paper,
+      paperRect: paperRect,
+      layerRect: rect,
+      text: text,
     );
-    final tp = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: painterTextStyle(layer, style),
-      ),
-      textDirection: TextDirection.ltr,
-      textAlign: style.textAlign,
-      maxLines: style.maxLines,
-      ellipsis: '…',
-    )..layout(maxWidth: rect.width);
-
-    final offset = _textOffset(rect, tp, style.textAlign);
-    tp.paint(canvas, offset);
-  }
-
-  Offset _textOffset(Rect rect, TextPainter tp, TextAlign align) {
-    final y = rect.top + (rect.height - tp.height) / 2;
-    switch (align) {
-      case TextAlign.left:
-      case TextAlign.start:
-        return Offset(rect.left, y);
-      case TextAlign.right:
-      case TextAlign.end:
-        return Offset(rect.right - tp.width, y);
-      case TextAlign.center:
-      case TextAlign.justify:
-        return Offset(rect.left + (rect.width - tp.width) / 2, y);
-    }
+    if (layout == null) return;
+    layout.painter.paint(canvas, layout.offset);
   }
 
   void _paintQr(Canvas canvas, Rect rect, String? payload) {

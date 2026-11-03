@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fotoboot_operator/models/print_template.dart';
@@ -173,6 +175,85 @@ TextStyle painterTextStyle(
     );
   }
   return buildTemplateTextStyle(resolved);
+}
+
+/// Laid-out text metrics shared by preview, compose, and saveLayer bounds.
+class TemplateTextLayout {
+  const TemplateTextLayout({required this.painter, required this.offset});
+
+  final TextPainter painter;
+  final Offset offset;
+
+  Rect get bounds =>
+      Rect.fromLTWH(offset.dx, offset.dy, painter.width, painter.height);
+}
+
+Offset templateTextPaintOffset(Rect rect, TextPainter tp, TextAlign align) {
+  final y = rect.top + (rect.height - tp.height) / 2;
+  switch (align) {
+    case TextAlign.left:
+    case TextAlign.start:
+      return Offset(rect.left, y);
+    case TextAlign.right:
+    case TextAlign.end:
+      return Offset(rect.right - tp.width, y);
+    case TextAlign.center:
+    case TextAlign.justify:
+      return Offset(rect.left + (rect.width - tp.width) / 2, y);
+  }
+}
+
+TemplateTextLayout? layoutTemplateText({
+  required TemplateLayer layer,
+  required TemplatePaper paper,
+  required Rect paperRect,
+  required Rect layerRect,
+  required String text,
+}) {
+  if (text.isEmpty) return null;
+  final style = resolveTextStyle(layer, paper, layerRect, paperRect);
+  final tp = TextPainter(
+    text: TextSpan(
+      text: text,
+      style: painterTextStyle(layer, style),
+    ),
+    textDirection: TextDirection.ltr,
+    textAlign: style.textAlign,
+    maxLines: style.maxLines,
+    ellipsis: '…',
+  )..layout(maxWidth: layerRect.width);
+  final offset = templateTextPaintOffset(layerRect, tp, style.textAlign);
+  return TemplateTextLayout(painter: tp, offset: offset);
+}
+
+/// saveLayer clip that includes stroke overflow and multi-line text paint bounds.
+Rect templateLayerSaveLayerRect({
+  required TemplateLayer layer,
+  required TemplatePaper paper,
+  required Rect paperRect,
+  required Rect layerRect,
+  required String text,
+}) {
+  var bounds = layerRect;
+  if (layer.type == TemplateLayerType.text) {
+    final layout = layoutTemplateText(
+      layer: layer,
+      paper: paper,
+      paperRect: paperRect,
+      layerRect: layerRect,
+      text: text,
+    );
+    if (layout != null) {
+      bounds = bounds.expandToInclude(layout.bounds);
+    }
+  }
+  var pad = 2.0;
+  if (layer.type == TemplateLayerType.shape) {
+    final mm = layer.strokeWidthMm ?? 0.25;
+    final strokePx = strokeWidthPxFromMm(mm, paper, paperRect);
+    pad = math.max(pad, strokePx / 2 + 0.5);
+  }
+  return bounds.inflate(pad);
 }
 
 /// Ensures bundled Google Fonts for typography layers are loaded before raster paint.

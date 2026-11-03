@@ -470,25 +470,12 @@ class _TextTypographyFields extends StatelessWidget {
             ),
             SizedBox(
               width: 120,
-              child: TextFormField(
-                key: ValueKey('pt-field-${layer.id}'),
-                initialValue: pt.toStringAsFixed(1),
-                decoration: const InputDecoration(
-                  isDense: true,
-                  border: OutlineInputBorder(),
-                  suffixText: 'pt',
+              child: _FontSizePtField(
+                layerId: layer.id,
+                pt: pt,
+                onCommit: (v) => controller.updateLayer(
+                  layer.copyWith(fontSizePt: v.clamp(6, 48)),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                onFieldSubmitted: (raw) {
-                  final v = double.tryParse(raw.replaceAll(',', '.'));
-                  if (v != null) {
-                    controller.updateLayer(
-                      layer.copyWith(fontSizePt: v.clamp(6, 48)),
-                    );
-                  }
-                },
               ),
             ),
           ],
@@ -579,11 +566,91 @@ class _TextTypographyFields extends StatelessWidget {
         _MaxLinesField(
           layerId: layer.id,
           value: layer.maxLines ?? TemplateTextDefaults.defaultMaxLines,
-          onCommit: (v) => controller.updateLayer(
-            layer.copyWith(maxLines: v.clamp(1, 12)),
-          ),
+          onCommit: (v) {
+            final clamped = v.clamp(1, 12);
+            final current =
+                layer.maxLines ?? TemplateTextDefaults.defaultMaxLines;
+            if (clamped == current) return;
+            controller.updateLayer(layer.copyWith(maxLines: clamped));
+          },
         ),
       ],
+    );
+  }
+}
+
+class _FontSizePtField extends StatefulWidget {
+  const _FontSizePtField({
+    required this.layerId,
+    required this.pt,
+    required this.onCommit,
+  });
+
+  final String layerId;
+  final double pt;
+  final ValueChanged<double> onCommit;
+
+  @override
+  State<_FontSizePtField> createState() => _FontSizePtFieldState();
+}
+
+class _FontSizePtFieldState extends State<_FontSizePtField> {
+  late final TextEditingController _controller;
+  late final FocusNode _focus;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus = FocusNode();
+    _controller = TextEditingController(text: widget.pt.toStringAsFixed(1));
+  }
+
+  @override
+  void didUpdateWidget(covariant _FontSizePtField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.layerId != widget.layerId) {
+      _controller.text = widget.pt.toStringAsFixed(1);
+      return;
+    }
+    if (!_focus.hasFocus) {
+      final next = widget.pt.toStringAsFixed(1);
+      if (_controller.text != next) {
+        _controller.text = next;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _commit(String raw) {
+    final v = double.tryParse(raw.replaceAll(',', '.'));
+    if (v == null) return;
+    final clamped = v.clamp(6.0, 48.0);
+    if ((clamped - widget.pt).abs() < 0.05) return;
+    widget.onCommit(clamped);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: _controller,
+      focusNode: _focus,
+      decoration: const InputDecoration(
+        isDense: true,
+        border: OutlineInputBorder(),
+        suffixText: 'pt',
+      ),
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      onFieldSubmitted: _commit,
+      onTapOutside: (_) {
+        _commit(_controller.text);
+        FocusScope.of(context).unfocus();
+      },
     );
   }
 }
@@ -639,16 +706,19 @@ class _MaxLinesFieldState extends State<_MaxLinesField> {
       ),
       keyboardType: TextInputType.number,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      onFieldSubmitted: (raw) {
-        final v = int.tryParse(raw);
-        if (v != null) widget.onCommit(v);
-      },
+      onFieldSubmitted: (raw) => _commitIfChanged(raw),
       onTapOutside: (_) {
-        final v = int.tryParse(_controller.text);
-        if (v != null) widget.onCommit(v);
+        _commitIfChanged(_controller.text);
         FocusScope.of(context).unfocus();
       },
     );
+  }
+
+  void _commitIfChanged(String raw) {
+    final v = int.tryParse(raw);
+    if (v == null) return;
+    if (v == widget.value) return;
+    widget.onCommit(v);
   }
 }
 

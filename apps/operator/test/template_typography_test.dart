@@ -4,8 +4,11 @@ import 'package:fotoboot_operator/models/print_template.dart';
 import 'package:fotoboot_operator/templates/editor/template_editor_controller.dart';
 import 'package:fotoboot_operator/templates/template_layer_typography.dart';
 import 'package:fotoboot_operator/templates/template_seed.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  GoogleFonts.config.allowRuntimeFetching = false;
   test('legacy text style matches Corte B defaults when fields absent', () {
     const layer = TemplateLayer(
       id: 't',
@@ -78,6 +81,42 @@ void main() {
     const layerRect = Rect.fromLTWH(0, 0, 576, 72);
     final style = resolveTextStyle(layer, paper, layerRect, paperRect);
     expect(style.maxLines, TemplateTextDefaults.defaultMaxLines);
+  });
+
+  test('saveLayer rect covers multi-line text taller than layer box', () {
+    const paper = TemplateSeed.thermalPaper;
+    const paperRect = Rect.fromLTWH(0, 0, 576, 720);
+    const layerRect = Rect.fromLTWH(46.08, 72, 483.84, 61.6);
+    const layer = TemplateLayer(
+      id: 't',
+      type: TemplateLayerType.text,
+      x: 0.08,
+      y: 0.1,
+      w: 0.84,
+      h: 0.0855,
+      text: 'Escanea y descarga tus fotos del evento hoy',
+      fontSizePt: 14,
+      fontWeight: 'bold',
+      maxLines: 2,
+    );
+    final layout = layoutTemplateText(
+      layer: layer,
+      paper: paper,
+      paperRect: paperRect,
+      layerRect: layerRect,
+      text: layer.text!,
+    );
+    expect(layout, isNotNull);
+    expect(layout!.bounds.height, greaterThan(layerRect.height));
+    final save = templateLayerSaveLayerRect(
+      layer: layer,
+      paper: paper,
+      paperRect: paperRect,
+      layerRect: layerRect,
+      text: layer.text!,
+    );
+    expect(save.top, lessThanOrEqualTo(layout.bounds.top));
+    expect(save.bottom, greaterThanOrEqualTo(layout.bounds.bottom));
   });
 
   test('JSON round-trip keeps Corte C typography and shape stroke', () {
