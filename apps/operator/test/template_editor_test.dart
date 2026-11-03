@@ -61,16 +61,28 @@ void main() {
   });
 
   test('editor controller undo/redo and slot starter', () {
+    const bg = TemplateLayer(
+      id: 'bg',
+      type: TemplateLayerType.background,
+      x: 0,
+      y: 0,
+      w: 1,
+      h: 1,
+    );
     final base = PrintTemplate(
       id: 't1',
       name: 'Demo',
       paper: TemplateSeed.thermalPaper,
-      layers: const [],
+      layers: const [bg],
     );
     final c = TemplateEditorController(initial: base);
     c.applyStarterOneSlot();
     expect(c.template.slotCount, 1);
-    expect(c.template.layers.first.slotIndex, 1);
+    expect(c.template.layers.first.type, TemplateLayerType.background);
+    expect(
+      c.template.layers.where((l) => l.type == TemplateLayerType.photoSlot).length,
+      1,
+    );
     c.applyStarterStrip();
     expect(c.template.slotCount, 3);
     c.undo();
@@ -162,6 +174,7 @@ void main() {
           h: 0.2,
           shapeKind: 'circle',
           fillColor: '#E10600',
+          strokeWidthMm: 0.4,
         ),
       ],
       dpi: 203,

@@ -6,10 +6,12 @@ import 'package:fotoboot_operator/services/photo_controller.dart';
 import 'package:fotoboot_operator/services/token_storage.dart';
 import 'package:fotoboot_operator/theme/app_theme.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  GoogleFonts.config.allowRuntimeFetching = false;
   await Hive.initFlutter();
 
   final tokens = TokenStorage();

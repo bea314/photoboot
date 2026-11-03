@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:fotoboot_operator/models/print_template.dart';
+import 'package:fotoboot_operator/templates/template_layer_typography.dart';
 import 'package:uuid/uuid.dart';
 
 /// Undo/redo + selection state for the template editor (Corte B).
@@ -231,8 +232,8 @@ class TemplateEditorController extends ChangeNotifier {
     );
   }
 
-  TemplateLayer newText() {
-    return TemplateLayer(
+  TemplateLayer newText({TemplateTextPresetId preset = TemplateTextPresetId.body}) {
+    final layer = TemplateLayer(
       id: _uuid.v4(),
       type: TemplateLayerType.text,
       x: 0.1,
@@ -242,6 +243,17 @@ class TemplateEditorController extends ChangeNotifier {
       text: '{{evento}}',
       role: 'brand',
     );
+    return TemplateTextPresets.apply(layer, preset);
+  }
+
+  void addTextPreset(TemplateTextPresetId preset) {
+    addLayer(newText(preset: preset));
+  }
+
+  void applyTextPresetToSelected(TemplateTextPresetId preset) {
+    final layer = selectedLayer;
+    if (layer == null || layer.type != TemplateLayerType.text) return;
+    updateLayer(TemplateTextPresets.apply(layer, preset));
   }
 
   TemplateLayer newQr() {
@@ -256,17 +268,48 @@ class TemplateEditorController extends ChangeNotifier {
     );
   }
 
-  TemplateLayer newShape({String kind = 'rect'}) {
-    return TemplateLayer(
-      id: _uuid.v4(),
-      type: TemplateLayerType.shape,
-      x: 0.2,
-      y: 0.2,
-      w: 0.4,
-      h: 0.2,
-      shapeKind: kind,
-      fillColor: '#E10600',
-      opacity: 1,
+  TemplateLayer newShape({
+    String kind = 'rect',
+    double? cornerRadius,
+    bool noFill = false,
+  }) {
+    return _centeredLayer(
+      TemplateLayer(
+        id: _uuid.v4(),
+        type: TemplateLayerType.shape,
+        x: 0.25,
+        y: 0.4,
+        w: 0.5,
+        h: kind == 'line' ? 0.015 : 0.18,
+        shapeKind: kind,
+        fillColor: noFill || kind == 'line' ? null : '#E10600',
+        strokeColor: '#000000',
+        strokeWidthMm: kind == 'line' ? 0.35 : 0.25,
+        cornerRadius: cornerRadius ?? (kind == 'roundedRect' ? 0.12 : null),
+        opacity: 1,
+      ),
+    );
+  }
+
+  void addShape(String kind) {
+    switch (kind) {
+      case 'rect':
+        addLayer(newShape(kind: 'rect', noFill: false));
+      case 'roundedRect':
+        addLayer(newShape(kind: 'roundedRect'));
+      case 'circle':
+        addLayer(newShape(kind: 'circle', noFill: false));
+      case 'line':
+        addLayer(newShape(kind: 'line', noFill: true));
+      default:
+        addLayer(newShape());
+    }
+  }
+
+  TemplateLayer _centeredLayer(TemplateLayer layer) {
+    return layer.copyWith(
+      x: ((1 - layer.w) / 2).clamp(0.0, 1.0),
+      y: ((1 - layer.h) / 2).clamp(0.0, 1.0),
     );
   }
 
@@ -300,15 +343,23 @@ class TemplateEditorController extends ChangeNotifier {
     );
   }
 
-  /// Starter: single full-bleed slot.
+  List<TemplateLayer> _layersWithoutPhotoSlots() {
+    return _template.layers
+        .where((l) => l.type != TemplateLayerType.photoSlot)
+        .toList();
+  }
+
+  /// Starter: single full-bleed slot (keeps fondo and non-slot layers).
   void applyStarterOneSlot() {
     final slot = newPhotoSlot(x: 0.04, y: 0.04, w: 0.92, h: 0.92)
         .copyWith(slotIndex: 1);
-    _commit(_template.copyWith(layers: [slot]));
+    _commit(
+      _template.copyWith(layers: [..._layersWithoutPhotoSlots(), slot]),
+    );
     _selectedLayerId = slot.id;
   }
 
-  /// Starter: vertical strip of 3 slots.
+  /// Starter: vertical strip of 3 slots (keeps fondo and non-slot layers).
   void applyStarterStrip() {
     const n = 3;
     final slots = <TemplateLayer>[];
@@ -322,7 +373,9 @@ class TemplateEditorController extends ChangeNotifier {
         ).copyWith(slotIndex: i + 1),
       );
     }
-    _commit(_template.copyWith(layers: slots));
+    _commit(
+      _template.copyWith(layers: [..._layersWithoutPhotoSlots(), ...slots]),
+    );
     _selectedLayerId = slots.first.id;
   }
 

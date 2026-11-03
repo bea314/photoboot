@@ -97,6 +97,14 @@ class TemplateLayer {
     this.strokeColor,
     this.assetKey,
     this.shapeKind,
+    this.fontSizePt,
+    this.fontWeight,
+    this.fontFamily,
+    this.textAlign,
+    this.color,
+    this.lineHeight,
+    this.maxLines,
+    this.strokeWidthMm,
   });
 
   final String id;
@@ -142,8 +150,20 @@ class TemplateLayer {
   /// Key in [TemplateAssetStore] for background / image bytes.
   final String? assetKey;
 
-  /// shape only — `rect` | `circle`.
+  /// shape only — `rect` | `roundedRect` | `circle` | `line`.
   final String? shapeKind;
+
+  /// Text typography (optional — absent = legacy composer sizing).
+  final double? fontSizePt;
+  final String? fontWeight;
+  final String? fontFamily;
+  final String? textAlign;
+  final String? color;
+  final double? lineHeight;
+  final int? maxLines;
+
+  /// Shape stroke width in mm (default ~0.35 mm in composer).
+  final double? strokeWidthMm;
 
   String get displayName {
     if (name != null && name!.trim().isNotEmpty) return name!.trim();
@@ -158,7 +178,16 @@ class TemplateLayer {
       case TemplateLayerType.qr:
         return 'QR';
       case TemplateLayerType.shape:
-        return shapeKind == 'circle' ? 'Círculo' : 'Rectángulo';
+        switch (shapeKind) {
+          case 'circle':
+            return 'Círculo';
+          case 'line':
+            return 'Línea';
+          case 'roundedRect':
+            return 'Rect redondeado';
+          default:
+            return 'Rectángulo';
+        }
       case TemplateLayerType.background:
         return 'Fondo';
     }
@@ -185,10 +214,24 @@ class TemplateLayer {
     String? strokeColor,
     String? assetKey,
     String? shapeKind,
+    double? fontSizePt,
+    String? fontWeight,
+    String? fontFamily,
+    String? textAlign,
+    String? color,
+    double? lineHeight,
+    int? maxLines,
+    double? strokeWidthMm,
     bool clearSlotIndex = false,
     bool clearText = false,
     bool clearAssetKey = false,
     bool clearFit = false,
+    bool clearFillColor = false,
+    bool clearStrokeColor = false,
+    bool clearCornerRadius = false,
+    bool clearFontSizePt = false,
+    bool clearColor = false,
+    bool clearMaxLines = false,
   }) {
     return TemplateLayer(
       id: id ?? this.id,
@@ -206,11 +249,21 @@ class TemplateLayer {
       locked: locked ?? this.locked,
       visible: visible ?? this.visible,
       opacity: opacity ?? this.opacity,
-      cornerRadius: cornerRadius ?? this.cornerRadius,
-      fillColor: fillColor ?? this.fillColor,
-      strokeColor: strokeColor ?? this.strokeColor,
+      cornerRadius:
+          clearCornerRadius ? null : (cornerRadius ?? this.cornerRadius),
+      fillColor: clearFillColor ? null : (fillColor ?? this.fillColor),
+      strokeColor:
+          clearStrokeColor ? null : (strokeColor ?? this.strokeColor),
       assetKey: clearAssetKey ? null : (assetKey ?? this.assetKey),
       shapeKind: shapeKind ?? this.shapeKind,
+      fontSizePt: clearFontSizePt ? null : (fontSizePt ?? this.fontSizePt),
+      fontWeight: fontWeight ?? this.fontWeight,
+      fontFamily: fontFamily ?? this.fontFamily,
+      textAlign: textAlign ?? this.textAlign,
+      color: clearColor ? null : (color ?? this.color),
+      lineHeight: lineHeight ?? this.lineHeight,
+      maxLines: clearMaxLines ? null : (maxLines ?? this.maxLines),
+      strokeWidthMm: strokeWidthMm ?? this.strokeWidthMm,
     );
   }
 
@@ -236,6 +289,14 @@ class TemplateLayer {
       if (strokeColor != null) 'strokeColor': strokeColor,
       if (assetKey != null) 'assetKey': assetKey,
       if (shapeKind != null) 'shapeKind': shapeKind,
+      if (fontSizePt != null) 'fontSizePt': fontSizePt,
+      if (fontWeight != null) 'fontWeight': fontWeight,
+      if (fontFamily != null) 'fontFamily': fontFamily,
+      if (textAlign != null) 'textAlign': textAlign,
+      if (color != null) 'color': color,
+      if (lineHeight != null) 'lineHeight': lineHeight,
+      if (maxLines != null) 'maxLines': maxLines,
+      if (strokeWidthMm != null) 'strokeWidthMm': strokeWidthMm,
     };
   }
 
@@ -261,6 +322,14 @@ class TemplateLayer {
       strokeColor: map['strokeColor'] as String?,
       assetKey: map['assetKey'] as String?,
       shapeKind: map['shapeKind'] as String?,
+      fontSizePt: (map['fontSizePt'] as num?)?.toDouble(),
+      fontWeight: map['fontWeight'] as String?,
+      fontFamily: map['fontFamily'] as String?,
+      textAlign: map['textAlign'] as String?,
+      color: map['color'] as String?,
+      lineHeight: (map['lineHeight'] as num?)?.toDouble(),
+      maxLines: (map['maxLines'] as num?)?.toInt(),
+      strokeWidthMm: (map['strokeWidthMm'] as num?)?.toDouble(),
     );
   }
 }

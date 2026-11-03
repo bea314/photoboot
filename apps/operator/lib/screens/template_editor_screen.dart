@@ -13,6 +13,7 @@ import 'package:fotoboot_operator/templates/editor/template_layer_list.dart';
 import 'package:fotoboot_operator/templates/editor/template_layer_props.dart';
 import 'package:fotoboot_operator/templates/template_composer.dart';
 import 'package:fotoboot_operator/templates/template_tokens.dart';
+import 'package:fotoboot_operator/templates/template_layer_typography.dart';
 import 'package:fotoboot_operator/templates/template_validation.dart';
 import 'package:fotoboot_operator/theme/app_colors.dart';
 import 'package:go_router/go_router.dart';
@@ -635,12 +636,49 @@ class _AddTab extends StatelessWidget {
           );
         }),
         tile(Icons.image_outlined, 'Imagen / logo', onPickImage),
-        tile(Icons.title, 'Texto', () => controller.addLayer(controller.newText())),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
+          child: Text(
+            'Texto',
+            style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.grey),
+          ),
+        ),
+        tile(Icons.title, 'Título', () {
+          controller.addTextPreset(TemplateTextPresetId.title);
+        }),
+        tile(Icons.text_fields, 'Subtítulo', () {
+          controller.addTextPreset(TemplateTextPresetId.subtitle);
+        }),
+        tile(Icons.notes, 'Cuerpo', () {
+          controller.addTextPreset(TemplateTextPresetId.body);
+        }),
         tile(Icons.qr_code_2, 'QR', () => controller.addLayer(controller.newQr())),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
+          child: Text(
+            'Elementos',
+            style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.grey),
+          ),
+        ),
         tile(
           Icons.crop_square,
-          'Forma',
-          () => controller.addLayer(controller.newShape()),
+          'Rectángulo',
+          () => controller.addShape('rect'),
+        ),
+        tile(
+          Icons.rounded_corner,
+          'Rect redondeado',
+          () => controller.addShape('roundedRect'),
+        ),
+        tile(
+          Icons.circle_outlined,
+          'Círculo / elipse',
+          () => controller.addShape('circle'),
+        ),
+        tile(
+          Icons.horizontal_rule,
+          'Línea (divisor)',
+          () => controller.addShape('line'),
         ),
         tile(Icons.wallpaper_outlined, 'Fondo', onPickBackground),
         const Divider(),

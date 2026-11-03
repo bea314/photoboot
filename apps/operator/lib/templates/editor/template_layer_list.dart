@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fotoboot_operator/models/print_template.dart';
 import 'package:fotoboot_operator/templates/editor/template_editor_controller.dart';
+import 'package:fotoboot_operator/templates/template_layer_typography.dart';
 import 'package:fotoboot_operator/theme/app_colors.dart';
 
 IconData layerTypeIcon(TemplateLayerType type) {
@@ -228,8 +229,20 @@ Future<void> showAddLayerSheet(
             ),
             tile(
               icon: Icons.title,
-              label: 'Texto',
-              onTap: () => controller.addLayer(controller.newText()),
+              label: 'Título',
+              onTap: () =>
+                  controller.addTextPreset(TemplateTextPresetId.title),
+            ),
+            tile(
+              icon: Icons.text_fields,
+              label: 'Subtítulo',
+              onTap: () =>
+                  controller.addTextPreset(TemplateTextPresetId.subtitle),
+            ),
+            tile(
+              icon: Icons.notes,
+              label: 'Cuerpo',
+              onTap: () => controller.addTextPreset(TemplateTextPresetId.body),
             ),
             tile(
               icon: Icons.qr_code_2,
@@ -238,14 +251,23 @@ Future<void> showAddLayerSheet(
             ),
             tile(
               icon: Icons.crop_square,
-              label: 'Forma (rectángulo)',
-              onTap: () => controller.addLayer(controller.newShape()),
+              label: 'Rectángulo',
+              onTap: () => controller.addShape('rect'),
+            ),
+            tile(
+              icon: Icons.rounded_corner,
+              label: 'Rect redondeado',
+              onTap: () => controller.addShape('roundedRect'),
             ),
             tile(
               icon: Icons.circle_outlined,
-              label: 'Forma (círculo)',
-              onTap: () =>
-                  controller.addLayer(controller.newShape(kind: 'circle')),
+              label: 'Círculo / elipse',
+              onTap: () => controller.addShape('circle'),
+            ),
+            tile(
+              icon: Icons.horizontal_rule,
+              label: 'Línea (divisor)',
+              onTap: () => controller.addShape('line'),
             ),
             tile(
               icon: Icons.wallpaper_outlined,

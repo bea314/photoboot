@@ -4,20 +4,12 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:fotoboot_operator/models/print_template.dart';
 import 'package:fotoboot_operator/printing/print_crop.dart';
+import 'package:fotoboot_operator/templates/template_layer_typography.dart';
 import 'package:fotoboot_operator/templates/template_tokens.dart';
 import 'package:fotoboot_operator/theme/app_colors.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-Color? _parseHex(String? raw) {
-  if (raw == null || raw.isEmpty) return null;
-  var s = raw.trim();
-  if (s.startsWith('#')) s = s.substring(1);
-  if (s.length == 6) s = 'FF$s';
-  if (s.length != 8) return null;
-  final value = int.tryParse(s, radix: 16);
-  if (value == null) return null;
-  return Color(value);
-}
+Color? _parseHex(String? raw) => parseTemplateHex(raw);
 
 /// Shared preview/print renderer: paints [PrintTemplate] layers onto a canvas.
 ///
@@ -81,7 +73,7 @@ class TemplateLayoutPainter extends CustomPainter {
         case TemplateLayerType.image:
           _paintImage(canvas, rect, layer);
         case TemplateLayerType.text:
-          _paintText(canvas, rect, context.resolve(layer.text));
+          _paintText(canvas, rect, context.resolve(layer.text), layer);
         case TemplateLayerType.qr:
           _paintQr(canvas, rect, _qrPayload(layer));
         case TemplateLayerType.shape:
@@ -221,60 +213,100 @@ class TemplateLayoutPainter extends CustomPainter {
   }
 
   void _paintShape(Canvas canvas, Rect rect, TemplateLayer layer) {
-    final fill = _parseHex(layer.fillColor) ?? AppColors.red;
-    final stroke = _parseHex(layer.strokeColor);
-    final paint = Paint()..color = fill;
+    final paper = template.paper;
+    final strokeW = layer.strokeWidthMm == null
+        ? 2.0
+        : strokeWidthPxFromMm(layer.strokeWidthMm!, paper, rect)
+            .clamp(0.5, 24.0);
+    final strokeColor =
+        _parseHex(layer.strokeColor) ?? AppColors.black.withValues(alpha: 0.85);
+    final fill = _parseHex(layer.fillColor);
+
+    if (layer.shapeKind == 'line') {
+      canvas.drawLine(
+        Offset(rect.left, rect.center.dy),
+        Offset(rect.right, rect.center.dy),
+        Paint()
+          ..color = strokeColor
+          ..strokeWidth = strokeW,
+      );
+      return;
+    }
+
     if (layer.shapeKind == 'circle') {
-      canvas.drawOval(rect, paint);
-      if (stroke != null) {
+      if (fill != null) {
+        canvas.drawOval(rect, Paint()..color = fill);
+      }
+      if (layer.strokeColor != null ||
+          layer.strokeWidthMm != null ||
+          fill == null) {
         canvas.drawOval(
           rect,
           Paint()
-            ..color = stroke
+            ..color = strokeColor
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 2,
+            ..strokeWidth = strokeW,
         );
       }
-    } else {
-      final radius = (layer.cornerRadius ?? 0) * rect.shortestSide;
-      final rrect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
-      canvas.drawRRect(rrect, paint);
-      if (stroke != null) {
-        canvas.drawRRect(
-          rrect,
-          Paint()
-            ..color = stroke
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2,
-        );
-      }
+      return;
+    }
+
+    final radius = (layer.cornerRadius ??
+            (layer.shapeKind == 'roundedRect' ? 0.08 : 0)) *
+        rect.shortestSide;
+    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
+    if (fill != null) {
+      canvas.drawRRect(rrect, Paint()..color = fill);
+    }
+    if (layer.strokeColor != null ||
+        layer.strokeWidthMm != null ||
+        fill == null) {
+      canvas.drawRRect(
+        rrect,
+        Paint()
+          ..color = strokeColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = strokeW,
+      );
     }
   }
 
-  void _paintText(Canvas canvas, Rect rect, String text) {
+  void _paintText(
+    Canvas canvas,
+    Rect rect,
+    String text,
+    TemplateLayer layer,
+  ) {
     if (text.isEmpty) return;
-    final fontSize = (rect.height * 0.55).clamp(10.0, 36.0);
+    final style = resolveTextStyle(layer, template.paper, rect);
     final tp = TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(
-          color: AppColors.black,
-          fontWeight: FontWeight.w600,
-          fontSize: fontSize,
-        ),
+        style: painterTextStyle(layer, style),
       ),
       textDirection: TextDirection.ltr,
-      textAlign: TextAlign.center,
-      maxLines: 2,
+      textAlign: style.textAlign,
+      maxLines: style.maxLines,
       ellipsis: '…',
     )..layout(maxWidth: rect.width);
-    tp.paint(
-      canvas,
-      Offset(
-        rect.left + (rect.width - tp.width) / 2,
-        rect.top + (rect.height - tp.height) / 2,
-      ),
-    );
+
+    final offset = _textOffset(rect, tp, style.textAlign);
+    tp.paint(canvas, offset);
+  }
+
+  Offset _textOffset(Rect rect, TextPainter tp, TextAlign align) {
+    final y = rect.top + (rect.height - tp.height) / 2;
+    switch (align) {
+      case TextAlign.left:
+      case TextAlign.start:
+        return Offset(rect.left, y);
+      case TextAlign.right:
+      case TextAlign.end:
+        return Offset(rect.right - tp.width, y);
+      case TextAlign.center:
+      case TextAlign.justify:
+        return Offset(rect.left + (rect.width - tp.width) / 2, y);
+    }
   }
 
   void _paintQr(Canvas canvas, Rect rect, String? payload) {
